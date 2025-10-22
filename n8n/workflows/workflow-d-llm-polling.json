@@ -1,0 +1,219 @@
+{
+  "name": "LLM Polling and Decision Execution",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 3 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "model1",
+              "name": "models",
+              "value": "={{ [\"chatgpt\", \"grok\", \"claude\", \"deepseek\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "symbol",
+              "name": "symbol",
+              "value": "SOLUSDT",
+              "type": "string"
+            },
+            {
+              "id": "current_index",
+              "name": "current_index",
+              "value": "={{ Math.floor(Date.now() / (3 * 60 * 1000)) % 4 }}",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "set-variables",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "current_model",
+              "name": "current_model",
+              "value": "={{ $json.models[$json.current_index] }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "select-model",
+      "name": "Select Model",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/llm/decision?model={{ $json.current_model }}&symbol={{ $json.symbol }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "get-llm-decision",
+      "name": "Get LLM Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action-check",
+              "leftValue": "={{ $json.decision.action }}",
+              "rightValue": "HOLD",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-action",
+      "name": "Should Execute?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/grid/apply",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.model }}\",\n  \"strategy\": \"grid\",\n  \"symbol\": \"{{ $('Select Model').item.json.symbol }}\",\n  \"lower\": {{ $json.decision.action === 'BUY' ? $json.market_data.current_price * 0.95 : $json.market_data.current_price * 0.90 }},\n  \"upper\": {{ $json.decision.action === 'BUY' ? $json.market_data.current_price * 1.05 : $json.market_data.current_price * 1.10 }},\n  \"grids\": 8,\n  \"spacing\": \"arithmetic\",\n  \"base_allocation\": {{ $json.decision.size_usd || 100 }},\n  \"leverage\": 1,\n  \"entry_mode\": \"maker_first\",\n  \"tp_pct\": 0.5,\n  \"sl_pct\": 0.5,\n  \"rebalance\": false,\n  \"notes\": \"{{ $json.decision.reasoning }}\"\n}",
+        "options": {}
+      },
+      "id": "execute-trade",
+      "name": "Execute Trade",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "log",
+              "name": "log_message",
+              "value": "={{ $json.model }} decided to {{ $json.decision.action }}: {{ $json.decision.reasoning }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "log-decision",
+      "name": "Log Decision",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Every 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Select Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Model": {
+      "main": [
+        [
+          {
+            "node": "Get LLM Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get LLM Decision": {
+      "main": [
+        [
+          {
+            "node": "Should Execute?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Execute?": {
+      "main": [
+        [
+          {
+            "node": "Execute Trade",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-22T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,161 @@
+{
+  "name": "Price Updates (Every 10 Seconds)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 10 Seconds",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "symbols",
+              "name": "symbols",
+              "value": "={{ [\"SOLUSDT\", \"BTCUSDT\", \"ETHUSDT\"] }}",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "id": "set-symbols",
+      "name": "Set Symbols",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-symbols",
+      "name": "Split Symbols",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://fapi.asterdex.com/fapi/v1/ticker/price?symbol={{ $json.symbols[$index] }}",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "fetch-price",
+      "name": "Fetch Price from Aster",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/price/update?symbol={{ $json.symbol }}&price={{ $json.price }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "update-price",
+      "name": "Update Price in DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {},
+      "id": "loop-back",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Every 10 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Set Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Symbols": {
+      "main": [
+        [
+          {
+            "node": "Split Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Symbols": {
+      "main": [
+        [
+          {
+            "node": "Fetch Price from Aster",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Price from Aster": {
+      "main": [
+        [
+          {
+            "node": "Update Price in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Price in DB": {
+      "main": [
+        [
+          {
+            "node": "Loop Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Back": {
+      "main": [
+        [
+          {
+            "node": "Split Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-22T00:00:00.000Z",
+  "versionId": "1"
+}
