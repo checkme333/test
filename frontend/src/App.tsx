@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { TrendingUp, Activity, AlertTriangle, Sparkles, Zap, Bot, Cpu } from 'lucide-react'
+import { TrendingUp, Activity, AlertTriangle } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -58,7 +58,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-green-500/10',
     textColor: 'text-green-400',
     borderColor: 'border-green-500/30',
-    icon: Sparkles
+    logo: '/logos/chatgpt.jpg'
   },
   grok: { 
     name: 'Grok',
@@ -66,7 +66,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-purple-500/10',
     textColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
-    icon: Zap
+    logo: '/logos/grok.webp'
   },
   claude: { 
     name: 'Claude',
@@ -74,7 +74,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-orange-500/10',
     textColor: 'text-orange-400',
     borderColor: 'border-orange-500/30',
-    icon: Bot
+    logo: '/logos/claude.webp'
   },
   deepseek: { 
     name: 'DeepSeek',
@@ -82,7 +82,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-blue-500/10',
     textColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
-    icon: Cpu
+    logo: '/logos/deepseek.jpeg'
   }
 }
 
@@ -182,10 +182,9 @@ function App() {
               </div>
               <div className="flex gap-2">
                 {Object.entries(MODEL_CONFIG).map(([key, config]) => {
-                  const Icon = config.icon
                   return (
                     <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/50">
-                      <Icon className={`w-4 h-4 ${config.textColor}`} />
+                      <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
                       <span className="text-sm text-gray-300">{config.name}</span>
                     </div>
                   )
@@ -253,7 +252,6 @@ function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {sortedAccounts.map((account, index) => {
             const config = MODEL_CONFIG[account.model as keyof typeof MODEL_CONFIG]
-            const Icon = config.icon
             const winRate = account.total_trades > 0 
               ? (account.winning_trades / account.total_trades * 100).toFixed(1) 
               : '0.0'
@@ -275,7 +273,7 @@ function App() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
-                      <Icon className={`w-6 h-6 ${config.textColor}`} />
+                      <img src={config.logo} alt={config.name} className="w-8 h-8 object-contain" />
                     </div>
                     <div>
                       <CardTitle className="text-white text-lg">{config.name}</CardTitle>
@@ -364,7 +362,6 @@ function App() {
             <div className="space-y-3">
               {stats?.recent_decisions.slice(0, 10).map((decision) => {
                 const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
-                const Icon = config.icon
                 return (
                   <div 
                     key={decision.id} 
@@ -373,7 +370,7 @@ function App() {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div className={`p-1.5 rounded ${config.bgColor}`}>
-                          <Icon className={`w-4 h-4 ${config.textColor}`} />
+                          <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -441,13 +438,12 @@ function App() {
                   <tbody>
                     {stats.positions.map((pos, idx) => {
                       const config = MODEL_CONFIG[pos.model as keyof typeof MODEL_CONFIG]
-                      const Icon = config.icon
                       const isProfitable = pos.unrealized_pnl >= 0
                       return (
                         <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30">
                           <td className="p-3">
                             <div className="flex items-center gap-2">
-                              <Icon className={`w-4 h-4 ${config.textColor}`} />
+                              <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
                               <span className="text-gray-300">{config.name}</span>
                             </div>
                           </td>
