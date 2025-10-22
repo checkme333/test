@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { TrendingUp, Activity, AlertTriangle } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -58,7 +58,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-green-500/10',
     textColor: 'text-green-400',
     borderColor: 'border-green-500/30',
-    logo: '/logos/chatgpt.jpg'
+    logo: '/logos/chatgpt.png'
   },
   grok: { 
     name: 'Grok',
@@ -74,7 +74,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-orange-500/10',
     textColor: 'text-orange-400',
     borderColor: 'border-orange-500/30',
-    logo: '/logos/claude.webp'
+    logo: '/logos/claude.png'
   },
   deepseek: { 
     name: 'DeepSeek',
@@ -82,7 +82,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-blue-500/10',
     textColor: 'text-blue-400',
     borderColor: 'border-blue-500/30',
-    logo: '/logos/deepseek.jpeg'
+    logo: '/logos/deepseek.png'
   }
 }
 
@@ -91,6 +91,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [equityHistory, setEquityHistory] = useState<any[]>([])
+  const [selectedModel, setSelectedModel] = useState<string>('all') // For filtering decisions/positions
 
   const fetchData = async () => {
     try {
@@ -350,59 +351,92 @@ function App() {
           </Card>
         )}
 
-        {/* Recent AI Decisions */}
+        {/* Recent AI Decisions with Model Filter */}
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-white">Recent AI Decisions</CardTitle>
-            <CardDescription className="text-gray-400">
-              Latest trading decisions with AI reasoning
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white">Recent AI Decisions</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Latest trading decisions with AI reasoning
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedModel('all')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                    selectedModel === 'all' 
+                      ? 'bg-gray-700 text-white' 
+                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  All
+                </button>
+                {Object.entries(MODEL_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedModel(key)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+                      selectedModel === key 
+                        ? `${config.bgColor} ${config.textColor} border ${config.borderColor}` 
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
+                    }`}
+                  >
+                    <img src={config.logo} alt={config.name} className="w-4 h-4 object-contain" />
+                    {config.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {stats?.recent_decisions.slice(0, 10).map((decision) => {
-                const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
-                return (
-                  <div 
-                    key={decision.id} 
-                    className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-1.5 rounded ${config.bgColor}`}>
-                          <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-semibold ${config.textColor}`}>
-                              {config.name}
-                            </span>
-                            <Badge variant={
-                              decision.action === 'BUY' ? 'default' : 
-                              decision.action === 'SELL' ? 'destructive' : 
-                              'outline'
-                            }>
-                              {decision.action}
-                            </Badge>
-                            <span className="text-sm text-gray-500">{decision.symbol}</span>
+              {stats?.recent_decisions
+                .filter(d => selectedModel === 'all' || d.model === selectedModel)
+                .slice(0, 10)
+                .map((decision) => {
+                  const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
+                  return (
+                    <div 
+                      key={decision.id} 
+                      className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded ${config.bgColor}`}>
+                            <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
                           </div>
-                          <p className="text-sm text-gray-400 mt-1">{decision.reasoning}</p>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-semibold ${config.textColor}`}>
+                                {config.name}
+                              </span>
+                              <Badge variant={
+                                decision.action === 'BUY' ? 'default' : 
+                                decision.action === 'SELL' ? 'destructive' : 
+                                'outline'
+                              }>
+                                {decision.action}
+                              </Badge>
+                              <span className="text-sm text-gray-500">{decision.symbol}</span>
+                            </div>
+                            <p className="text-sm text-gray-400 mt-1">{decision.reasoning}</p>
+                          </div>
                         </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(decision.created_at).toLocaleTimeString()}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(decision.created_at).toLocaleTimeString()}
-                      </span>
+                      {decision.decision_data && (
+                        <div className="flex gap-4 text-xs text-gray-500 mt-2 pl-11">
+                          <span>Size: ${decision.decision_data.size_usd?.toFixed(2)}</span>
+                          <span>Confidence: {(decision.decision_data.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
                     </div>
-                    {decision.decision_data && (
-                      <div className="flex gap-4 text-xs text-gray-500 mt-2 pl-11">
-                        <span>Size: ${decision.decision_data.size_usd?.toFixed(2)}</span>
-                        <span>Confidence: {(decision.decision_data.confidence * 100).toFixed(0)}%</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {(!stats?.recent_decisions || stats.recent_decisions.length === 0) && (
+                  )
+                })}
+              {(!stats?.recent_decisions || stats.recent_decisions.filter(d => selectedModel === 'all' || d.model === selectedModel).length === 0) && (
                 <div className="text-center py-12 text-gray-500">
                   <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No decisions yet. AI models will start making decisions soon.</p>
@@ -412,16 +446,16 @@ function App() {
           </CardContent>
         </Card>
 
-        {/* Current Positions */}
+        {/* Current Positions with Model Filter */}
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
             <CardTitle className="text-white">Current Positions</CardTitle>
             <CardDescription className="text-gray-400">
-              Active positions across all AI models
+              Active positions {selectedModel === 'all' ? 'across all AI models' : `for ${MODEL_CONFIG[selectedModel as keyof typeof MODEL_CONFIG]?.name}`}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {stats?.positions && stats.positions.length > 0 ? (
+            {stats?.positions && stats.positions.filter(p => selectedModel === 'all' || p.model === selectedModel).length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -436,32 +470,34 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.positions.map((pos, idx) => {
-                      const config = MODEL_CONFIG[pos.model as keyof typeof MODEL_CONFIG]
-                      const isProfitable = pos.unrealized_pnl >= 0
-                      return (
-                        <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
-                              <span className="text-gray-300">{config.name}</span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-gray-300">{pos.symbol}</td>
-                          <td className="p-3">
-                            <Badge variant={pos.side === 'long' ? 'default' : 'destructive'}>
-                              {pos.side.toUpperCase()}
-                            </Badge>
-                          </td>
-                          <td className="text-right p-3 text-gray-300">{pos.size}</td>
-                          <td className="text-right p-3 text-gray-300">${pos.entry_price.toFixed(2)}</td>
-                          <td className="text-right p-3 text-gray-300">${pos.current_price?.toFixed(2) || '-'}</td>
-                          <td className={`text-right p-3 font-semibold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-                            {isProfitable ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {stats.positions
+                      .filter(p => selectedModel === 'all' || p.model === selectedModel)
+                      .map((pos, idx) => {
+                        const config = MODEL_CONFIG[pos.model as keyof typeof MODEL_CONFIG]
+                        const isProfitable = pos.unrealized_pnl >= 0
+                        return (
+                          <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
+                                <span className="text-gray-300">{config.name}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-gray-300">{pos.symbol}</td>
+                            <td className="p-3">
+                              <Badge variant={pos.side === 'long' ? 'default' : 'destructive'}>
+                                {pos.side.toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="text-right p-3 text-gray-300">{pos.size}</td>
+                            <td className="text-right p-3 text-gray-300">${pos.entry_price.toFixed(2)}</td>
+                            <td className="text-right p-3 text-gray-300">${pos.current_price?.toFixed(2) || '-'}</td>
+                            <td className={`text-right p-3 font-semibold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                              {isProfitable ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}
+                            </td>
+                          </tr>
+                        )
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -473,6 +509,49 @@ function App() {
             )}
           </CardContent>
         </Card>
+
+        {/* Token Cards - BTC, ETH, BNB, ASTER */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {['BTC', 'ETH', 'BNB', 'ASTER'].map((symbol) => {
+            const price = stats?.prices?.[`${symbol}USDT`] || 0
+            const priceStr = price > 0 ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'
+            
+            return (
+              <Card key={symbol} className="bg-gray-900/50 border-gray-800 hover:border-gray-700 transition">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-sm">
+                        {symbol.charAt(0)}
+                      </div>
+                      <span className="font-bold text-white">{symbol}</span>
+                    </div>
+                    <span className="text-2xl font-bold text-white">{priceStr}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+                    <div>
+                      <p className="mb-1">SMA: 0</p>
+                      <p>VOL: 0</p>
+                    </div>
+                    <div>
+                      <p className="mb-1">EMA: 0</p>
+                      <p>OBV: 0</p>
+                    </div>
+                    <div>
+                      <p className="mb-1">RSI: 0</p>
+                      <p>SUP: 0</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between text-xs">
+                    <span className="text-gray-500">MACD: 0</span>
+                    <span className="text-gray-500">ATR: 0</span>
+                    <span className="text-gray-500">AO: 0</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       </div>
 
       {/* Footer */}
