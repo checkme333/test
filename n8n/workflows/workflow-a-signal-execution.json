@@ -1,0 +1,198 @@
+{
+  "name": "Workflow A: Grid Signal Execution",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signal/grid",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook - Grid Signal",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "grid-signal-webhook"
+    },
+    {
+      "parameters": {
+        "functionCode": "const signal = $input.item.json;\n\nif (!signal.model || !signal.symbol || !signal.lower || !signal.upper || !signal.grids) {\n  throw new Error('Missing required fields in signal');\n}\n\nif (!['chatgpt', 'grok'].includes(signal.model)) {\n  throw new Error('Invalid model: must be chatgpt or grok');\n}\n\nconst key = `ratelimit:${signal.model}:${signal.symbol}`;\nconst redis = $('Redis').getNode();\n\nconst lastTime = await redis.get(key);\nconst now = Date.now();\n\nif (lastTime && (now - parseInt(lastTime)) < 60000) {\n  throw new Error(`Rate limit: ${signal.model}/${signal.symbol} can only be called once per 60s`);\n}\n\nawait redis.set(key, now.toString(), 'EX', 120);\n\nreturn { json: signal };"
+      },
+      "id": "function-validate",
+      "name": "Validate & Rate Limit",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/grid/apply",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "http-apply-grid",
+      "name": "Apply Grid to Trading Core",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "equals",
+              "value2": "ok"
+            }
+          ]
+        }
+      },
+      "id": "if-success",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const result = $input.item.json;\nconst signal = $node['Webhook - Grid Signal'].json;\n\nconst message = `✅ Grid Applied Successfully\\n\\nModel: ${signal.model}\\nSymbol: ${signal.symbol}\\nConfig ID: ${result.config_id}\\nLevels Placed: ${result.placed}/${result.total_levels}\\nErrors: ${result.errors}`;\n\nreturn { json: { message, success: true } };"
+      },
+      "id": "format-success",
+      "name": "Format Success Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const error = $input.item.json;\nconst signal = $node['Webhook - Grid Signal'].json;\n\nconst message = `❌ Grid Application Failed\\n\\nModel: ${signal.model}\\nSymbol: ${signal.symbol}\\nError: ${error.message || JSON.stringify(error)}`;\n\nreturn { json: { message, success: false } };"
+      },
+      "id": "format-error",
+      "name": "Format Error Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}"
+      },
+      "id": "telegram-notify",
+      "name": "Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1250, 500],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Grid Signal": {
+      "main": [
+        [
+          {
+            "node": "Validate & Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "Apply Grid to Trading Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Grid to Trading Core": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Format Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success Message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-22T00:00:00.000Z",
+  "versionId": "1"
+}

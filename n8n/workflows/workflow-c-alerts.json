@@ -1,0 +1,190 @@
+{
+  "name": "Workflow C: Alerts & Risk Monitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "cron-monitor",
+      "name": "Every 10 Seconds",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://trading-core:8000/pnl?window=daily",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "http-check-pnl",
+      "name": "Check Daily PnL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const metrics = $input.item.json.metrics || [];\nconst alerts = [];\n\nconst DAILY_LOSS_LIMIT = -200;\nconst MAX_EXPOSURE = 5000;\nconst MAX_DRAWDOWN = 0.15;\n\nfor (const metric of metrics) {\n  if (metric.daily_pnl < DAILY_LOSS_LIMIT) {\n    alerts.push({\n      type: 'daily_loss',\n      severity: 'critical',\n      model: metric.model,\n      symbol: metric.symbol,\n      value: metric.daily_pnl,\n      threshold: DAILY_LOSS_LIMIT,\n      message: `🚨 CRITICAL: ${metric.model}/${metric.symbol} daily loss ${metric.daily_pnl} exceeds limit ${DAILY_LOSS_LIMIT}`\n    });\n  }\n  \n  if (metric.exposure > MAX_EXPOSURE) {\n    alerts.push({\n      type: 'exposure',\n      severity: 'high',\n      model: metric.model,\n      symbol: metric.symbol,\n      value: metric.exposure,\n      threshold: MAX_EXPOSURE,\n      message: `⚠️ HIGH: ${metric.model}/${metric.symbol} exposure ${metric.exposure} exceeds limit ${MAX_EXPOSURE}`\n    });\n  }\n  \n  if (metric.max_drawdown > MAX_DRAWDOWN) {\n    alerts.push({\n      type: 'drawdown',\n      severity: 'medium',\n      model: metric.model,\n      symbol: metric.symbol,\n      value: metric.max_drawdown,\n      threshold: MAX_DRAWDOWN,\n      message: `⚠️ MEDIUM: ${metric.model}/${metric.symbol} drawdown ${(metric.max_drawdown * 100).toFixed(2)}% exceeds ${(MAX_DRAWDOWN * 100)}%`\n    });\n  }\n}\n\nif (alerts.length === 0) {\n  return [];\n}\n\nreturn alerts.map(alert => ({ json: alert }));"
+      },
+      "id": "check-thresholds",
+      "name": "Check Risk Thresholds",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.severity }}",
+              "operation": "equals",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "id": "if-critical",
+      "name": "Is Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/grid/pause?model={{ $json.model }}&symbol={{ $json.symbol }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "http-pause-grid",
+      "name": "Pause Grid (Circuit Breaker)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}"
+      },
+      "id": "telegram-alert",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO alerts (ts, type, severity, model, symbol, value, threshold, message) VALUES (NOW(), $1, $2, $3, $4, $5, $6, $7)",
+        "options": {}
+      },
+      "id": "postgres-log-alert",
+      "name": "Log Alert to Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 450],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 10 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Check Daily PnL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Daily PnL": {
+      "main": [
+        [
+          {
+            "node": "Check Risk Thresholds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Risk Thresholds": {
+      "main": [
+        [
+          {
+            "node": "Is Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Critical?": {
+      "main": [
+        [
+          {
+            "node": "Pause Grid (Circuit Breaker)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Grid (Circuit Breaker)": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Alert to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-10-22T00:00:00.000Z",
+  "versionId": "1"
+}

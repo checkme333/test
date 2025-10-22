@@ -1,0 +1,16 @@
+{
+  "model": "grok",
+  "strategy": "grid",
+  "symbol": "SOLUSDT",
+  "lower": 175.0,
+  "upper": 215.0,
+  "grids": 15,
+  "spacing": "geometric",
+  "base_allocation": 2000,
+  "leverage": 2,
+  "entry_mode": "maker_first",
+  "tp_pct": 0.04,
+  "sl_pct": 0.06,
+  "rebalance": false,
+  "notes": "Wider range with geometric spacing to capture volatility. More aggressive TP/SL compared to ChatGPT strategy."
+}

@@ -1,0 +1,16 @@
+{
+  "model": "chatgpt",
+  "strategy": "grid",
+  "symbol": "SOLUSDT",
+  "lower": 180.0,
+  "upper": 210.0,
+  "grids": 12,
+  "spacing": "arithmetic",
+  "base_allocation": 2000,
+  "leverage": 2,
+  "entry_mode": "maker_first",
+  "tp_pct": 0.03,
+  "sl_pct": 0.05,
+  "rebalance": false,
+  "notes": "Range-bound strategy for SOL, expecting consolidation between 180-210. Using arithmetic spacing for even distribution."
+}
