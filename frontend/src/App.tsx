@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Activity, AlertTriangle, Brain, Twitter, Coins } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { TrendingUp, Activity, AlertTriangle, Sparkles, Zap, Bot, Cpu } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -52,11 +51,39 @@ interface DashboardStats {
   timestamp: string
 }
 
-const MODEL_COLORS = {
-  chatgpt: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-500', chart: '#3b82f6' },
-  grok: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-500', chart: '#a855f7' },
-  claude: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-500', chart: '#f97316' },
-  deepseek: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-500', chart: '#10b981' }
+const MODEL_CONFIG = {
+  chatgpt: { 
+    name: 'ChatGPT',
+    color: '#10b981', // green
+    bgColor: 'bg-green-500/10',
+    textColor: 'text-green-400',
+    borderColor: 'border-green-500/30',
+    icon: Sparkles
+  },
+  grok: { 
+    name: 'Grok',
+    color: '#a855f7', // purple
+    bgColor: 'bg-purple-500/10',
+    textColor: 'text-purple-400',
+    borderColor: 'border-purple-500/30',
+    icon: Zap
+  },
+  claude: { 
+    name: 'Claude',
+    color: '#f97316', // orange
+    bgColor: 'bg-orange-500/10',
+    textColor: 'text-orange-400',
+    borderColor: 'border-orange-500/30',
+    icon: Bot
+  },
+  deepseek: { 
+    name: 'DeepSeek',
+    color: '#3b82f6', // blue
+    bgColor: 'bg-blue-500/10',
+    textColor: 'text-blue-400',
+    borderColor: 'border-blue-500/30',
+    icon: Cpu
+  }
 }
 
 function App() {
@@ -73,7 +100,11 @@ function App() {
       const data = await res.json()
       setStats(data)
       
-      const timestamp = new Date().toLocaleTimeString()
+      const timestamp = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      })
       const newDataPoint: any = { timestamp }
       data.accounts.forEach((acc: ModelAccount) => {
         newDataPoint[acc.model] = acc.current_balance
@@ -81,7 +112,7 @@ function App() {
       
       setEquityHistory(prev => {
         const updated = [...prev, newDataPoint]
-        return updated.slice(-50)
+        return updated.slice(-100) // Keep last 100 data points
       })
       
       setError(null)
@@ -94,153 +125,226 @@ function App() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 10000)
+    const interval = setInterval(fetchData, 5000) // Update every 5 seconds
     return () => clearInterval(interval)
   }, [])
 
-  const ModelCompetitionCard = ({ account }: { account: ModelAccount }) => {
-    const color = MODEL_COLORS[account.model as keyof typeof MODEL_COLORS]
-    const winRate = account.total_trades > 0 
-      ? (account.winning_trades / account.total_trades * 100).toFixed(1) 
-      : '0.0'
-    const pnlPercent = ((account.total_pnl / account.initial_balance) * 100).toFixed(2)
-    const isProfitable = account.total_pnl >= 0
-
-    return (
-      <Card className={`${color.bg} border-2 ${color.border}`}>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Brain className={`w-5 h-5 ${color.text}`} />
-              <span className={color.text}>{account.model.toUpperCase()}</span>
-            </div>
-            <Badge variant={isProfitable ? "default" : "destructive"}>
-              {pnlPercent}%
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Balance</span>
-              <span className="text-xl font-bold">${account.current_balance.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">P&L</span>
-              <span className={`text-lg font-semibold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
-                {isProfitable ? '+' : ''}${account.total_pnl.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Win Rate</span>
-              <span className="text-lg font-semibold">{winRate}%</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Trades</span>
-              <span className="text-sm">{account.winning_trades}W / {account.losing_trades}L</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Max DD</span>
-              <span className="text-sm text-red-600">{(account.max_drawdown * 100).toFixed(2)}%</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <Activity className="w-16 h-16 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-xl text-gray-300">Loading AI Trading Arena...</p>
+          <Activity className="w-16 h-16 animate-spin mx-auto mb-4 text-green-500" />
+          <p className="text-xl text-gray-300">Loading AI Trading Competition...</p>
         </div>
       </div>
     )
   }
 
   const sortedAccounts = stats?.accounts.sort((a, b) => b.total_pnl - a.total_pnl) || []
-  const leader = sortedAccounts[0]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-black text-white">
+      {/* Header */}
+      <div className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2">
-                AI Trading Arena
-              </h1>
-              <p className="text-gray-400 text-lg">4 AI Models Competing in Real-Time Trading</p>
+              <h1 className="text-2xl font-bold text-white">AI Trading Competition</h1>
+              <p className="text-sm text-gray-400">Real-time performance tracking</p>
             </div>
-            <div className="flex gap-4">
-              <a 
-                href="https://twitter.com/your_project" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
-              >
-                <Twitter className="w-5 h-5" />
-                <span>Follow Us</span>
-              </a>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Last Update</p>
+                <p className="text-sm text-gray-300">{new Date().toLocaleTimeString()}</p>
+              </div>
             </div>
           </div>
-
-          {leader && (
-            <Alert className="bg-yellow-900/30 border-yellow-600">
-              <TrendingUp className="w-4 h-4 text-yellow-500" />
-              <AlertDescription className="text-yellow-200">
-                <strong>{leader.model.toUpperCase()}</strong> is currently leading with ${leader.total_pnl.toFixed(2)} profit!
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
         {error && (
-          <Alert className="mb-6 bg-red-900/30 border-red-600">
+          <Alert className="bg-red-900/20 border-red-600/50">
             <AlertTriangle className="w-4 h-4 text-red-500" />
             <AlertDescription className="text-red-200">{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="mb-8">
-          <Card className="bg-gray-800/50 border-gray-700">
+        {/* Main Chart - Like nof1.ai */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white text-xl">Portfolio Value Over Time</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Real-time equity curves for all AI models
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                {Object.entries(MODEL_CONFIG).map(([key, config]) => {
+                  const Icon = config.icon
+                  return (
+                    <div key={key} className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-800/50">
+                      <Icon className={`w-4 h-4 ${config.textColor}`} />
+                      <span className="text-sm text-gray-300">{config.name}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityHistory}>
+                  <defs>
+                    {Object.entries(MODEL_CONFIG).map(([key, config]) => (
+                      <linearGradient key={key} id={`gradient-${key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={config.color} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={config.color} stopOpacity={0}/>
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                  <XAxis 
+                    dataKey="timestamp" 
+                    stroke="#6b7280" 
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="#6b7280" 
+                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    tickLine={false}
+                    domain={['dataMin - 50', 'dataMax + 50']}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#111827', 
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                      padding: '12px'
+                    }}
+                    labelStyle={{ color: '#9ca3af', marginBottom: '8px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="line"
+                  />
+                  {Object.entries(MODEL_CONFIG).map(([key, config]) => (
+                    <Area
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      stroke={config.color}
+                      strokeWidth={2}
+                      fill={`url(#gradient-${key})`}
+                      name={config.name}
+                    />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Model Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {sortedAccounts.map((account, index) => {
+            const config = MODEL_CONFIG[account.model as keyof typeof MODEL_CONFIG]
+            const Icon = config.icon
+            const winRate = account.total_trades > 0 
+              ? (account.winning_trades / account.total_trades * 100).toFixed(1) 
+              : '0.0'
+            const pnlPercent = ((account.total_pnl / account.initial_balance) * 100).toFixed(2)
+            const isProfitable = account.total_pnl >= 0
+
+            return (
+              <Card 
+                key={account.model} 
+                className={`${config.bgColor} border ${config.borderColor} relative overflow-hidden`}
+              >
+                {index === 0 && (
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                      🏆 Leader
+                    </Badge>
+                  </div>
+                )}
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
+                      <Icon className={`w-6 h-6 ${config.textColor}`} />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-lg">{config.name}</CardTitle>
+                      <p className="text-xs text-gray-500">AI Model #{index + 1}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm text-gray-400">Balance</span>
+                    <span className="text-2xl font-bold text-white">
+                      ${account.current_balance.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">P&L</span>
+                    <div className="text-right">
+                      <span className={`text-lg font-semibold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                        {isProfitable ? '+' : ''}${account.total_pnl.toFixed(2)}
+                      </span>
+                      <Badge 
+                        variant={isProfitable ? "default" : "destructive"}
+                        className="ml-2"
+                      >
+                        {pnlPercent}%
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-800 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Win Rate</span>
+                      <span className="text-gray-300 font-medium">{winRate}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Trades</span>
+                      <span className="text-gray-300">
+                        <span className="text-green-400">{account.winning_trades}W</span>
+                        {' / '}
+                        <span className="text-red-400">{account.losing_trades}L</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Max Drawdown</span>
+                      <span className="text-red-400">{(account.max_drawdown * 100).toFixed(2)}%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Live Market Prices */}
+        {stats && stats.prices && Object.keys(stats.prices).length > 0 && (
+          <Card className="bg-gray-900/50 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Coins className="w-5 h-5 text-yellow-500" />
-                Project Token (Coming Soon)
+                <Activity className="w-5 h-5 text-green-500" />
+                Live Market Prices
               </CardTitle>
-              <CardDescription className="text-gray-400">
-                Our official token will be launched soon. Stay tuned for updates!
-              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-gray-300">
-                <p className="mb-2">This AI trading competition is powered by our upcoming token ecosystem.</p>
-                <p className="text-sm text-gray-400">Token holders will get exclusive access to advanced features and trading insights.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {sortedAccounts.map((account) => (
-            <ModelCompetitionCard key={account.model} account={account} />
-          ))}
-        </div>
-
-        {stats && stats.prices && Object.keys(stats.prices).length > 0 && (
-          <Card className="bg-gray-800/50 border-gray-700 mb-8">
-            <CardHeader>
-              <CardTitle className="text-white">Live Market Prices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-6">
                 {Object.entries(stats.prices).map(([symbol, price]) => (
-                  <div key={symbol} className="text-center">
-                    <p className="text-gray-400 text-sm">{symbol}</p>
-                    <p className="text-2xl font-bold text-white">${price.toFixed(2)}</p>
+                  <div key={symbol} className="text-center p-4 bg-gray-800/50 rounded-lg">
+                    <p className="text-gray-400 text-sm mb-1">{symbol}</p>
+                    <p className="text-3xl font-bold text-white">${price.toFixed(2)}</p>
                   </div>
                 ))}
               </div>
@@ -248,64 +352,34 @@ function App() {
           </Card>
         )}
 
-        <Tabs defaultValue="chart" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-800/50">
-            <TabsTrigger value="chart">Equity Curves</TabsTrigger>
-            <TabsTrigger value="decisions">AI Decisions</TabsTrigger>
-            <TabsTrigger value="positions">Positions</TabsTrigger>
-            <TabsTrigger value="stats">Statistics</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="chart">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Real-Time Equity Curves</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Live performance comparison across all AI models
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={equityHistory}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis dataKey="timestamp" stroke="#9ca3af" />
-                      <YAxis stroke="#9ca3af" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
-                        labelStyle={{ color: '#9ca3af' }}
-                      />
-                      <Legend />
-                      <Line type="monotone" dataKey="chatgpt" stroke={MODEL_COLORS.chatgpt.chart} strokeWidth={2} />
-                      <Line type="monotone" dataKey="grok" stroke={MODEL_COLORS.grok.chart} strokeWidth={2} />
-                      <Line type="monotone" dataKey="claude" stroke={MODEL_COLORS.claude.chart} strokeWidth={2} />
-                      <Line type="monotone" dataKey="deepseek" stroke={MODEL_COLORS.deepseek.chart} strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="decisions">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Recent AI Decisions</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Latest trading decisions with AI reasoning
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {stats?.recent_decisions.slice(0, 10).map((decision) => {
-                    const color = MODEL_COLORS[decision.model as keyof typeof MODEL_COLORS]
-                    return (
-                      <div key={decision.id} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                        <div className="flex items-start justify-between mb-2">
+        {/* Recent AI Decisions */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Recent AI Decisions</CardTitle>
+            <CardDescription className="text-gray-400">
+              Latest trading decisions with AI reasoning
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats?.recent_decisions.slice(0, 10).map((decision) => {
+                const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
+                const Icon = config.icon
+                return (
+                  <div 
+                    key={decision.id} 
+                    className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-1.5 rounded ${config.bgColor}`}>
+                          <Icon className={`w-4 h-4 ${config.textColor}`} />
+                        </div>
+                        <div>
                           <div className="flex items-center gap-2">
-                            <Badge className={`${color.bg} ${color.text}`}>
-                              {decision.model.toUpperCase()}
-                            </Badge>
+                            <span className={`font-semibold ${config.textColor}`}>
+                              {config.name}
+                            </span>
                             <Badge variant={
                               decision.action === 'BUY' ? 'default' : 
                               decision.action === 'SELL' ? 'destructive' : 
@@ -313,158 +387,105 @@ function App() {
                             }>
                               {decision.action}
                             </Badge>
-                            <span className="text-sm text-gray-400">{decision.symbol}</span>
+                            <span className="text-sm text-gray-500">{decision.symbol}</span>
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {new Date(decision.created_at).toLocaleTimeString()}
-                          </span>
+                          <p className="text-sm text-gray-400 mt-1">{decision.reasoning}</p>
                         </div>
-                        <p className="text-gray-300 text-sm mb-2">{decision.reasoning}</p>
-                        {decision.decision_data && (
-                          <div className="flex gap-4 text-xs text-gray-400">
-                            <span>Size: ${decision.decision_data.size_usd?.toFixed(2)}</span>
-                            <span>Confidence: {(decision.decision_data.confidence * 100).toFixed(0)}%</span>
-                          </div>
-                        )}
                       </div>
-                    )
-                  })}
-                  {(!stats?.recent_decisions || stats.recent_decisions.length === 0) && (
-                    <div className="text-center py-8 text-gray-500">
-                      No decisions yet. AI models will start making decisions soon.
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        {new Date(decision.created_at).toLocaleTimeString()}
+                      </span>
                     </div>
-                  )}
+                    {decision.decision_data && (
+                      <div className="flex gap-4 text-xs text-gray-500 mt-2 pl-11">
+                        <span>Size: ${decision.decision_data.size_usd?.toFixed(2)}</span>
+                        <span>Confidence: {(decision.decision_data.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {(!stats?.recent_decisions || stats.recent_decisions.length === 0) && (
+                <div className="text-center py-12 text-gray-500">
+                  <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No decisions yet. AI models will start making decisions soon.</p>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-          <TabsContent value="positions">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Current Positions</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Active positions across all AI models
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left p-2 text-gray-400">Model</th>
-                        <th className="text-left p-2 text-gray-400">Symbol</th>
-                        <th className="text-left p-2 text-gray-400">Side</th>
-                        <th className="text-right p-2 text-gray-400">Size</th>
-                        <th className="text-right p-2 text-gray-400">Entry</th>
-                        <th className="text-right p-2 text-gray-400">Current</th>
-                        <th className="text-right p-2 text-gray-400">P&L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stats?.positions.map((pos, idx) => {
-                        const color = MODEL_COLORS[pos.model as keyof typeof MODEL_COLORS]
-                        const isProfitable = pos.unrealized_pnl >= 0
-                        return (
-                          <tr key={idx} className="border-b border-gray-800 hover:bg-gray-900/50">
-                            <td className="p-2">
-                              <Badge className={`${color.bg} ${color.text}`}>
-                                {pos.model}
-                              </Badge>
-                            </td>
-                            <td className="p-2 text-gray-300">{pos.symbol}</td>
-                            <td className="p-2">
-                              <Badge variant={pos.side === 'long' ? 'default' : 'destructive'}>
-                                {pos.side.toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="text-right p-2 text-gray-300">{pos.size}</td>
-                            <td className="text-right p-2 text-gray-300">${pos.entry_price.toFixed(2)}</td>
-                            <td className="text-right p-2 text-gray-300">${pos.current_price?.toFixed(2) || '-'}</td>
-                            <td className={`text-right p-2 font-semibold ${isProfitable ? 'text-green-500' : 'text-red-500'}`}>
-                              {isProfitable ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                  {(!stats?.positions || stats.positions.length === 0) && (
-                    <div className="text-center py-8 text-gray-500">
-                      No open positions
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Current Positions */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Current Positions</CardTitle>
+            <CardDescription className="text-gray-400">
+              Active positions across all AI models
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.positions && stats.positions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-800">
+                      <th className="text-left p-3 text-gray-400 font-medium">Model</th>
+                      <th className="text-left p-3 text-gray-400 font-medium">Symbol</th>
+                      <th className="text-left p-3 text-gray-400 font-medium">Side</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Size</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Entry</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Current</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.positions.map((pos, idx) => {
+                      const config = MODEL_CONFIG[pos.model as keyof typeof MODEL_CONFIG]
+                      const Icon = config.icon
+                      const isProfitable = pos.unrealized_pnl >= 0
+                      return (
+                        <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <Icon className={`w-4 h-4 ${config.textColor}`} />
+                              <span className="text-gray-300">{config.name}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-gray-300">{pos.symbol}</td>
+                          <td className="p-3">
+                            <Badge variant={pos.side === 'long' ? 'default' : 'destructive'}>
+                              {pos.side.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className="text-right p-3 text-gray-300">{pos.size}</td>
+                          <td className="text-right p-3 text-gray-300">${pos.entry_price.toFixed(2)}</td>
+                          <td className="text-right p-3 text-gray-300">${pos.current_price?.toFixed(2) || '-'}</td>
+                          <td className={`text-right p-3 font-semibold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                            {isProfitable ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No open positions</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          <TabsContent value="stats">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Detailed Statistics</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Comprehensive performance metrics for all models
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left p-2 text-gray-400">Model</th>
-                        <th className="text-right p-2 text-gray-400">Initial</th>
-                        <th className="text-right p-2 text-gray-400">Current</th>
-                        <th className="text-right p-2 text-gray-400">P&L</th>
-                        <th className="text-right p-2 text-gray-400">ROI</th>
-                        <th className="text-right p-2 text-gray-400">Win Rate</th>
-                        <th className="text-right p-2 text-gray-400">Trades</th>
-                        <th className="text-right p-2 text-gray-400">Max DD</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedAccounts.map((account) => {
-                        const color = MODEL_COLORS[account.model as keyof typeof MODEL_COLORS]
-                        const roi = ((account.total_pnl / account.initial_balance) * 100).toFixed(2)
-                        const winRate = account.total_trades > 0 
-                          ? (account.winning_trades / account.total_trades * 100).toFixed(1) 
-                          : '0.0'
-                        const isProfitable = account.total_pnl >= 0
-                        
-                        return (
-                          <tr key={account.model} className="border-b border-gray-800 hover:bg-gray-900/50">
-                            <td className="p-2">
-                              <Badge className={`${color.bg} ${color.text}`}>
-                                {account.model.toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="text-right p-2 text-gray-300">${account.initial_balance.toFixed(2)}</td>
-                            <td className="text-right p-2 text-gray-300">${account.current_balance.toFixed(2)}</td>
-                            <td className={`text-right p-2 font-semibold ${isProfitable ? 'text-green-500' : 'text-red-500'}`}>
-                              {isProfitable ? '+' : ''}${account.total_pnl.toFixed(2)}
-                            </td>
-                            <td className={`text-right p-2 font-semibold ${isProfitable ? 'text-green-500' : 'text-red-500'}`}>
-                              {isProfitable ? '+' : ''}{roi}%
-                            </td>
-                            <td className="text-right p-2 text-gray-300">{winRate}%</td>
-                            <td className="text-right p-2 text-gray-300">
-                              {account.total_trades} ({account.winning_trades}W/{account.losing_trades}L)
-                            </td>
-                            <td className="text-right p-2 text-red-500">{(account.max_drawdown * 100).toFixed(2)}%</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>Last updated: {stats?.timestamp ? new Date(stats.timestamp).toLocaleString() : 'N/A'}</p>
-          <p className="mt-2">Auto-refreshing every 10 seconds</p>
+      {/* Footer */}
+      <div className="border-t border-gray-800 mt-12">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="text-center text-gray-500 text-sm">
+            <p>AI Trading Competition • Real-time Performance Tracking</p>
+            <p className="mt-1">Powered by ChatGPT, Grok, Claude, and DeepSeek</p>
+          </div>
         </div>
       </div>
     </div>
