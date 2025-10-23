@@ -3,14 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { TrendingUp, Activity, AlertTriangle } from 'lucide-react'
+import { TrendingUp, Activity, AlertTriangle, Twitter } from 'lucide-react'
+import { MaintenancePage } from '@/components/MaintenancePage'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const MAINTENANCE_MODE = import.meta.env.VITE_MAINTENANCE_MODE === 'true'
 
 interface ModelAccount {
   model: string
   initial_balance: number
   current_balance: number
+  total_position_value: number
+  total_position_margin: number
+  unrealized_pnl: number
+  total_equity: number
   total_pnl: number
   total_trades: number
   winning_trades: number
@@ -43,11 +49,25 @@ interface Position {
   unrealized_pnl: number
 }
 
+interface Order {
+  id: number
+  model: string
+  symbol: string
+  side: string
+  price: number
+  qty: number
+  status: string
+  pnl: number
+  created_at: string
+}
+
 interface DashboardStats {
   accounts: ModelAccount[]
   prices: Record<string, number>
+  price_changes: Record<string, number>
   recent_decisions: Decision[]
   positions: Position[]
+  orders: Order[]
   timestamp: string
 }
 
@@ -87,6 +107,10 @@ const MODEL_CONFIG = {
 }
 
 function App() {
+  if (MAINTENANCE_MODE) {
+    return <MaintenancePage />
+  }
+
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -96,29 +120,42 @@ function App() {
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_BASE}/dashboard/stats`)
-      if (!res.ok) throw new Error('Failed to fetch data')
+      if (!res.ok) {
+        console.warn('Failed to fetch data, will retry...')
+        return
+      }
       
       const data = await res.json()
       setStats(data)
       
-      const timestamp = new Date().toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      const now = new Date()
+      const timestamp = now.toLocaleString('en-US', { 
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit'
-      })
-      const newDataPoint: any = { timestamp }
+        hour12: false
+      }).replace(',', '')
+      
+      const newDataPoint: any = { timestamp, time: now.getTime() }
       data.accounts.forEach((acc: ModelAccount) => {
-        newDataPoint[acc.model] = acc.current_balance
+        newDataPoint[acc.model] = acc.total_equity - acc.initial_balance
       })
       
       setEquityHistory(prev => {
+        const lastPoint = prev[prev.length - 1]
+        if (lastPoint && now.getTime() - lastPoint.time < 60000) {
+          const updated = [...prev]
+          updated[updated.length - 1] = newDataPoint
+          return updated
+        }
         const updated = [...prev, newDataPoint]
-        return updated.slice(-100) // Keep last 100 data points
+        return updated.slice(-200) // Keep last 200 data points
       })
       
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      console.warn('Error fetching data:', err)
     } finally {
       setLoading(false)
     }
@@ -149,11 +186,23 @@ function App() {
       <div className="border-b border-gray-800 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">AI Trading Competition</h1>
-              <p className="text-sm text-gray-400">Real-time performance tracking</p>
+            <div className="flex items-center gap-3">
+              <img src="/logo.png" alt="AlgoArena" className="w-10 h-10 object-contain" />
+              <div>
+                <h1 className="text-2xl font-bold text-white">AlgoArena</h1>
+                <p className="text-sm text-gray-400">AI Trading Competition</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
+              <a 
+                href="https://x.com/ArenaAlgo" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-800/50 hover:bg-gray-700 transition-colors"
+                title="Follow us on X (Twitter)"
+              >
+                <Twitter className="w-5 h-5 text-gray-300 hover:text-white" />
+              </a>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Last Update</p>
                 <p className="text-sm text-gray-300">{new Date().toLocaleTimeString()}</p>
@@ -209,15 +258,24 @@ function App() {
                   <XAxis 
                     dataKey="timestamp" 
                     stroke="#6b7280" 
-                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                    tick={{ fill: '#9ca3af', fontSize: 11 }}
                     tickLine={false}
+                    angle={-15}
+                    textAnchor="end"
+                    height={60}
                   />
                   <YAxis 
                     stroke="#6b7280" 
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
                     tickLine={false}
-                    domain={['dataMin - 50', 'dataMax + 50']}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(value) => {
+                      const sign = value >= 0 ? '+' : '';
+                      return `${sign}$${value.toFixed(0)}`;
+                    }}
                   />
+                  {/* Zero reference line */}
+                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#6b7280" strokeWidth={1} strokeDasharray="5 5" />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: '#111827', 
@@ -227,6 +285,11 @@ function App() {
                     }}
                     labelStyle={{ color: '#9ca3af', marginBottom: '8px' }}
                     itemStyle={{ color: '#fff' }}
+                    formatter={(value: any) => {
+                      const numValue = Number(value);
+                      const sign = numValue >= 0 ? '+' : '';
+                      return `${sign}$${numValue.toFixed(2)}`;
+                    }}
                   />
                   <Legend 
                     wrapperStyle={{ paddingTop: '20px' }}
@@ -284,9 +347,24 @@ function App() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between items-baseline">
-                    <span className="text-sm text-gray-400">Balance</span>
+                    <span className="text-sm text-gray-400">Total Equity</span>
                     <span className="text-2xl font-bold text-white">
-                      ${account.current_balance.toFixed(2)}
+                      ${account.total_equity.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500">Cash Balance</span>
+                    <span className="text-gray-300">${account.current_balance.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500">Position Margin</span>
+                    <span className="text-gray-300">${(account.total_position_margin || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-500">Unrealized PNL</span>
+                    <span className={`${(account.unrealized_pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {(account.unrealized_pnl || 0) >= 0 ? '+' : ''}${(account.unrealized_pnl || 0).toFixed(2)}
                     </span>
                   </div>
                   
@@ -329,28 +407,6 @@ function App() {
           })}
         </div>
 
-        {/* Live Market Prices */}
-        {stats && stats.prices && Object.keys(stats.prices).length > 0 && (
-          <Card className="bg-gray-900/50 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Activity className="w-5 h-5 text-green-500" />
-                Live Market Prices
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-6">
-                {Object.entries(stats.prices).map(([symbol, price]) => (
-                  <div key={symbol} className="text-center p-4 bg-gray-800/50 rounded-lg">
-                    <p className="text-gray-400 text-sm mb-1">{symbol}</p>
-                    <p className="text-3xl font-bold text-white">${price.toFixed(2)}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Recent AI Decisions with Model Filter */}
         <Card className="bg-gray-900/50 border-gray-800">
           <CardHeader>
@@ -390,10 +446,10 @@ function App() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
               {stats?.recent_decisions
                 .filter(d => selectedModel === 'all' || d.model === selectedModel)
-                .slice(0, 10)
+                .slice(0, 50)
                 .map((decision) => {
                   const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
                   return (
@@ -411,11 +467,13 @@ function App() {
                               <span className={`font-semibold ${config.textColor}`}>
                                 {config.name}
                               </span>
-                              <Badge variant={
-                                decision.action === 'BUY' ? 'default' : 
-                                decision.action === 'SELL' ? 'destructive' : 
-                                'outline'
-                              }>
+                              <Badge 
+                                className={
+                                  decision.action === 'BUY' ? 'bg-green-500 text-white hover:bg-green-600' : 
+                                  decision.action === 'SELL' ? 'bg-red-500 text-white hover:bg-red-600' : 
+                                  'bg-white text-black hover:bg-gray-100'
+                                }
+                              >
                                 {decision.action}
                               </Badge>
                               <span className="text-sm text-gray-500">{decision.symbol}</span>
@@ -456,7 +514,7 @@ function App() {
           </CardHeader>
           <CardContent>
             {stats?.positions && stats.positions.filter(p => selectedModel === 'all' || p.model === selectedModel).length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-800">
@@ -485,7 +543,9 @@ function App() {
                             </td>
                             <td className="p-3 text-gray-300">{pos.symbol}</td>
                             <td className="p-3">
-                              <Badge variant={pos.side === 'long' ? 'default' : 'destructive'}>
+                              <Badge 
+                                className={pos.side.toLowerCase() === 'long' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}
+                              >
                                 {pos.side.toUpperCase()}
                               </Badge>
                             </td>
@@ -510,42 +570,111 @@ function App() {
           </CardContent>
         </Card>
 
+        {/* Order History */}
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Order History</CardTitle>
+            <CardDescription className="text-gray-400">
+              Completed orders {selectedModel === 'all' ? 'across all AI models' : `for ${MODEL_CONFIG[selectedModel as keyof typeof MODEL_CONFIG]?.name}`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.orders && stats.orders.filter(o => selectedModel === 'all' || o.model === selectedModel).length > 0 ? (
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-800">
+                      <th className="text-left p-3 text-gray-400 font-medium">Model</th>
+                      <th className="text-left p-3 text-gray-400 font-medium">Symbol</th>
+                      <th className="text-left p-3 text-gray-400 font-medium">Side</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Price</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Qty</th>
+                      <th className="text-left p-3 text-gray-400 font-medium">Status</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">P&L</th>
+                      <th className="text-right p-3 text-gray-400 font-medium">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.orders
+                      .filter(o => selectedModel === 'all' || o.model === selectedModel)
+                      .slice(0, 100)
+                      .map((order) => {
+                        const config = MODEL_CONFIG[order.model as keyof typeof MODEL_CONFIG]
+                        const isProfitable = order.pnl >= 0
+                        return (
+                          <tr key={order.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <img src={config.logo} alt={config.name} className="w-5 h-5 object-contain" />
+                                <span className="text-gray-300">{config.name}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-gray-300">{order.symbol}</td>
+                            <td className="p-3">
+                              <Badge 
+                                className={order.side.toLowerCase() === 'buy' || order.side.toLowerCase() === 'long' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}
+                              >
+                                {order.side.toUpperCase()}
+                              </Badge>
+                            </td>
+                            <td className="text-right p-3 text-gray-300">${order.price.toFixed(2)}</td>
+                            <td className="text-right p-3 text-gray-300">{order.qty}</td>
+                            <td className="p-3">
+                              <Badge 
+                                className={
+                                  order.status === 'FILLED' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
+                                  order.status === 'CANCELLED' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' : 
+                                  'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                                }
+                              >
+                                {order.status}
+                              </Badge>
+                            </td>
+                            <td className={`text-right p-3 font-semibold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                              {isProfitable ? '+' : ''}${order.pnl.toFixed(2)}
+                            </td>
+                            <td className="text-right p-3 text-gray-500 text-xs">
+                              {new Date(order.created_at).toLocaleString()}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No order history yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Token Cards - BTC, ETH, BNB, ASTER */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {['BTC', 'ETH', 'BNB', 'ASTER'].map((symbol) => {
             const price = stats?.prices?.[`${symbol}USDT`] || 0
             const priceStr = price > 0 ? `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'
+            const change24h = stats?.price_changes?.[`${symbol}USDT`] || 0
+            const isPositive = change24h >= 0
             
             return (
               <Card key={symbol} className="bg-gray-900/50 border-gray-800 hover:border-gray-700 transition">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold text-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white font-bold">
                         {symbol.charAt(0)}
                       </div>
-                      <span className="font-bold text-white">{symbol}</span>
-                    </div>
-                    <span className="text-2xl font-bold text-white">{priceStr}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
-                    <div>
-                      <p className="mb-1">SMA: 0</p>
-                      <p>VOL: 0</p>
-                    </div>
-                    <div>
-                      <p className="mb-1">EMA: 0</p>
-                      <p>OBV: 0</p>
-                    </div>
-                    <div>
-                      <p className="mb-1">RSI: 0</p>
-                      <p>SUP: 0</p>
+                      <span className="font-bold text-white text-lg">{symbol}/USDT</span>
                     </div>
                   </div>
-                  <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between text-xs">
-                    <span className="text-gray-500">MACD: 0</span>
-                    <span className="text-gray-500">ATR: 0</span>
-                    <span className="text-gray-500">AO: 0</span>
+                  <div className="space-y-2">
+                    <div className="text-3xl font-bold text-white">{priceStr}</div>
+                    <div className={`text-sm font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                      {isPositive ? '+' : ''}{change24h.toFixed(2)}% (24h)
+                    </div>
                   </div>
                 </CardContent>
               </Card>
