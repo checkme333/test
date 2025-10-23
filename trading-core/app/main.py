@@ -69,16 +69,19 @@ async def place_order(order: OrderRequest):
         result = await client.place_order(order)
         
         if result and result.get('orderId'):
-            db.insert_order(
-                model=order.model or 'default',
-                symbol=order.symbol,
-                client_order_id=order.client_order_id or f"order_{result['orderId']}",
-                exchange_order_id=str(result['orderId']),
-                side=order.side.value,
-                price=float(order.price) if order.price else 0,
-                qty=float(order.qty),
-                status='NEW'
-            )
+            db.insert_order({
+                'model': order.model or 'default',
+                'symbol': order.symbol,
+                'client_order_id': order.client_order_id or f"order_{result['orderId']}",
+                'exchange_order_id': str(result['orderId']),
+                'side': order.side.value,
+                'price': float(order.price) if order.price else 0,
+                'qty': float(order.qty),
+                'fill_qty': 0,
+                'status': 'NEW',
+                'fee': 0,
+                'pnl': 0
+            })
             logger.info(f"Recorded order {result['orderId']} to database")
         
         return result
@@ -743,24 +746,29 @@ async def get_dashboard_stats():
                 
                 for symbol in symbols:
                     try:
-                        orders = await client.get_all_orders(symbol, limit=50)
-                        for order in orders:
-                            if order.get('status') == 'FILLED':
-                                all_orders.append({
-                                    "id": order.get('orderId'),
-                                    "model": model,
-                                    "symbol": order.get('symbol'),
-                                    "side": order.get('side'),
-                                    "price": float(order.get('avgPrice', 0)),
-                                    "qty": float(order.get('executedQty', 0)),
-                                    "status": order.get('status'),
-                                    "pnl": 0,
-                                    "created_at": datetime.fromtimestamp(int(order.get('updateTime', 0)) / 1000).isoformat()
-                                })
+                        trades = await client.get_user_trades(symbol, limit=50)
+                        for trade in trades:
+                            realized_pnl = float(trade.get('realizedPnl', 0))
+                            commission = float(trade.get('commission', 0))
+                            
+                            if realized_pnl == 0 and commission != 0:
+                                realized_pnl = -abs(commission)
+                            
+                            all_orders.append({
+                                "id": trade.get('id'),
+                                "model": model,
+                                "symbol": trade.get('symbol'),
+                                "side": trade.get('side'),
+                                "price": float(trade.get('price', 0)),
+                                "qty": float(trade.get('qty', 0)),
+                                "status": "FILLED",
+                                "pnl": realized_pnl,
+                                "created_at": datetime.fromtimestamp(int(trade.get('time', 0)) / 1000).isoformat()
+                            })
                     except Exception as e:
-                        logger.warning(f"Error fetching orders for {model} {symbol}: {str(e)}")
+                        logger.warning(f"Error fetching trades for {model} {symbol}: {str(e)}")
             except Exception as e:
-                logger.error(f"Error fetching orders for {model}: {str(e)}")
+                logger.error(f"Error fetching trades for {model}: {str(e)}")
         
         all_orders.sort(key=lambda x: x['created_at'], reverse=True)
         all_orders = all_orders[:100]

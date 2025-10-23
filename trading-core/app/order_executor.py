@@ -69,13 +69,21 @@ async def _execute_open(client, model: str, symbol: str, decision: Dict[str, Any
     
     account_info = await client.get_account()
     available_balance = float(account_info.get('availableBalance', current_balance))
+    total_position_margin = float(account_info.get('totalPositionInitialMargin', 0))
+    total_unrealized_pnl = float(account_info.get('totalUnrealizedProfit', 0))
     
-    if available_balance < 100:
-        logger.warning(f"{model}: Available balance ${available_balance:.2f} < $100, skipping order")
+    total_equity = available_balance + total_position_margin + total_unrealized_pnl
+    
+    max_usable_equity = total_equity * 0.8
+    already_used = total_position_margin
+    max_operable = max_usable_equity - already_used
+    
+    if max_operable < 50:
+        logger.warning(f"{model}: Max operable ${max_operable:.2f} < $50, already using 80% of equity")
         return {
             "status": "skipped",
             "action": action,
-            "message": f"Available balance ${available_balance:.2f} is below $100 minimum"
+            "message": f"Already using 80% of total equity (${total_equity:.2f}), cannot open new position"
         }
     
     if size_usd < 50:
@@ -86,7 +94,6 @@ async def _execute_open(client, model: str, symbol: str, decision: Dict[str, Any
             "message": f"Order size ${size_usd} is below $50 minimum"
         }
     
-    max_operable = min(available_balance - 100, 400)
     if size_usd > max_operable:
         logger.warning(f"{model}: Requested size ${size_usd} exceeds max operable ${max_operable:.2f}, adjusting")
         size_usd = max_operable

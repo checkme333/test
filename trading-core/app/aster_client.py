@@ -19,16 +19,20 @@ class AsterClient:
         self.api_secret = settings.aster_api_secret
         self.client = httpx.AsyncClient(timeout=30.0)
         self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        self._symbol_precision_cache = {}
         if self.mock_mode:
             logger.info("🎭 MOCK MODE ENABLED - Using simulated Aster API responses")
     
     def _generate_signature(self, params: Dict[str, Any]) -> str:
-        query_string = "&".join([f"{k}={v}" for k, v in sorted(params.items())])
+        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
+        logger.info(f"Generating signature with query_string: {query_string}")
+        logger.info(f"Using API key: {self.api_key[:10]}... and secret: {self.api_secret[:10]}...")
         signature = hmac.new(
             self.api_secret.encode('utf-8'),
             query_string.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
+        logger.info(f"Generated signature: {signature}")
         return signature
     
     async def _request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None, 
@@ -38,7 +42,8 @@ class AsterClient:
         
         if signed:
             params['timestamp'] = int(time.time() * 1000)
-            params['signature'] = self._generate_signature(params)
+            signature = self._generate_signature(params)
+            params['signature'] = signature
         
         headers = {
             'X-MBX-APIKEY': self.api_key
@@ -50,9 +55,9 @@ class AsterClient:
             if method == "GET":
                 response = await self.client.get(url, params=params, headers=headers)
             elif method == "POST":
-                response = await self.client.post(url, params=params, headers=headers)
+                response = await self.client.post(url, data=params, headers=headers)
             elif method == "DELETE":
-                response = await self.client.delete(url, params=params, headers=headers)
+                response = await self.client.delete(url, data=params, headers=headers)
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
@@ -79,6 +84,31 @@ class AsterClient:
             params['symbol'] = symbol
         return await self._request("GET", endpoint, params, signed=False)
     
+    async def _get_symbol_precision(self, symbol: str) -> tuple[int, int]:
+        """Get quantity and price precision for a symbol. Returns (quantity_precision, price_precision)"""
+        if symbol in self._symbol_precision_cache:
+            return self._symbol_precision_cache[symbol]
+        
+        try:
+            exchange_info = await self.get_exchange_info(symbol)
+            for sym_info in exchange_info.get('symbols', []):
+                if sym_info['symbol'] == symbol:
+                    qty_precision = sym_info.get('quantityPrecision', 3)
+                    price_precision = sym_info.get('pricePrecision', 2)
+                    self._symbol_precision_cache[symbol] = (qty_precision, price_precision)
+                    logger.info(f"Symbol {symbol} precision: qty={qty_precision}, price={price_precision}")
+                    return (qty_precision, price_precision)
+            
+            logger.warning(f"Could not find precision for {symbol}, using defaults")
+            return (3, 2)
+        except Exception as e:
+            logger.error(f"Error getting precision for {symbol}: {e}")
+            return (3, 2)
+    
+    def _format_quantity(self, quantity: float, precision: int) -> str:
+        """Format quantity to the correct precision"""
+        return f"{quantity:.{precision}f}"
+    
     async def place_order(self, order: OrderRequest) -> Dict[str, Any]:
         if self.mock_mode:
             mock_order_id = str(uuid.uuid4())[:8]
@@ -98,23 +128,32 @@ class AsterClient:
             logger.info(f"🎭 MOCK: Order placed: {mock_response}")
             return mock_response
         
+        qty_precision, price_precision = await self._get_symbol_precision(order.symbol)
+        
+        formatted_qty = self._format_quantity(order.qty, qty_precision)
+        
         endpoint = "/fapi/v1/order"
         params = {
             'symbol': order.symbol,
             'side': order.side.value.upper(),
             'type': order.order_type,
-            'quantity': str(order.qty),
-            'timeInForce': order.time_in_force,
+            'quantity': formatted_qty,
         }
         
+        if order.order_type != "MARKET":
+            params['timeInForce'] = order.time_in_force
+        
         if order.price:
-            params['price'] = str(order.price)
+            formatted_price = self._format_quantity(order.price, price_precision)
+            params['price'] = formatted_price
         
         if order.client_order_id:
             params['newClientOrderId'] = order.client_order_id
         
         if order.reduce_only:
             params['reduceOnly'] = 'true'
+        
+        logger.info(f"Placing order: {order.symbol} {order.side.value.upper()} {formatted_qty} @ {params.get('price', 'MARKET')}")
         
         try:
             result = await self._request("POST", endpoint, params)
@@ -176,6 +215,15 @@ class AsterClient:
         }
         return await self._request("GET", endpoint, params)
     
+    async def get_user_trades(self, symbol: str, limit: int = 500) -> List[Dict[str, Any]]:
+        """Get account trade history with realized P&L"""
+        endpoint = "/fapi/v1/userTrades"
+        params = {
+            'symbol': symbol,
+            'limit': limit
+        }
+        return await self._request("GET", endpoint, params)
+    
     async def get_position(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         if self.mock_mode:
             mock_positions = [{
@@ -221,8 +269,55 @@ class AsterClient:
         result = await self._request("GET", endpoint, params, signed=False)
         return result[0] if result else {}
     
+    async def get_ticker(self, symbol: str) -> Dict[str, Any]:
+        endpoint = "/fapi/v1/ticker/24hr"
+        params = {'symbol': symbol}
+        return await self._request("GET", endpoint, params, signed=False)
+    
+    async def get_depth(self, symbol: str, limit: int = 20) -> Dict[str, Any]:
+        """Get order book depth"""
+        endpoint = "/fapi/v1/depth"
+        params = {
+            'symbol': symbol,
+            'limit': limit
+        }
+        return await self._request("GET", endpoint, params, signed=False)
+    
+    async def change_leverage(self, symbol: str, leverage: int) -> Dict[str, Any]:
+        """Change leverage for a symbol"""
+        endpoint = "/fapi/v1/leverage"
+        params = {
+            'symbol': symbol,
+            'leverage': leverage
+        }
+        return await self._request("POST", endpoint, params)
+    
     async def close(self):
         await self.client.aclose()
 
 
 aster_client = AsterClient()
+
+
+def get_model_aster_client(model: str) -> AsterClient:
+    """Get Aster client for a specific model"""
+    from app.config import settings
+    
+    model_keys = {
+        "chatgpt": (settings.chatgpt_aster_api_key, settings.chatgpt_aster_api_secret),
+        "grok": (settings.grok_aster_api_key, settings.grok_aster_api_secret),
+        "claude": (settings.claude_aster_api_key, settings.claude_aster_api_secret),
+        "deepseek": (settings.deepseek_aster_api_key, settings.deepseek_aster_api_secret),
+    }
+    
+    if model not in model_keys:
+        return aster_client
+    
+    api_key, api_secret = model_keys[model]
+    if not api_key or not api_secret:
+        return aster_client
+    
+    client = AsterClient()
+    client.api_key = api_key
+    client.api_secret = api_secret
+    return client
