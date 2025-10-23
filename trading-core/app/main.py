@@ -663,7 +663,7 @@ async def get_dashboard_stats():
                     client = get_model_aster_client(model)
                     
                     account_info = await client.get_account()
-                    total_margin_balance = float(account_info.get('totalMarginBalance', 0))
+                    available_balance = float(account_info.get('availableBalance', 0))
                     total_position_margin = float(account_info.get('totalPositionInitialMargin', 0))
                     total_unrealized_pnl = float(account_info.get('totalUnrealizedProfit', 0))
                     
@@ -676,10 +676,16 @@ async def get_dashboard_stats():
                             mark_price = float(pos.get('markPrice', 0))
                             total_position_value += abs(position_amt) * mark_price
                     
+                    total_equity = available_balance + total_position_margin + total_unrealized_pnl
+                    
+                    total_pnl = total_equity - float(account['initial_balance'])
+                    
+                    account['current_balance'] = available_balance
                     account['total_position_value'] = total_position_value
                     account['total_position_margin'] = total_position_margin
                     account['unrealized_pnl'] = total_unrealized_pnl
-                    account['total_equity'] = total_margin_balance
+                    account['total_equity'] = total_equity
+                    account['total_pnl'] = total_pnl
                 except Exception as e:
                     logger.error(f"Error getting positions for {model}: {str(e)}")
                     account['total_position_value'] = 0
@@ -729,7 +735,35 @@ async def get_dashboard_stats():
             except Exception as e:
                 logger.error(f"Error getting positions for {model}: {str(e)}")
         
-        all_orders = db.get_orders(limit=100)
+        all_orders = []
+        for model in models:
+            try:
+                client = get_model_aster_client(model)
+                symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ASTERUSDT", "SOLUSDT"]
+                
+                for symbol in symbols:
+                    try:
+                        orders = await client.get_all_orders(symbol, limit=50)
+                        for order in orders:
+                            if order.get('status') == 'FILLED':
+                                all_orders.append({
+                                    "id": order.get('orderId'),
+                                    "model": model,
+                                    "symbol": order.get('symbol'),
+                                    "side": order.get('side'),
+                                    "price": float(order.get('avgPrice', 0)),
+                                    "qty": float(order.get('executedQty', 0)),
+                                    "status": order.get('status'),
+                                    "pnl": 0,
+                                    "created_at": datetime.fromtimestamp(int(order.get('updateTime', 0)) / 1000).isoformat()
+                                })
+                    except Exception as e:
+                        logger.warning(f"Error fetching orders for {model} {symbol}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error fetching orders for {model}: {str(e)}")
+        
+        all_orders.sort(key=lambda x: x['created_at'], reverse=True)
+        all_orders = all_orders[:100]
         
         return {
             "accounts": accounts,

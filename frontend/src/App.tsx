@@ -139,10 +139,22 @@ function App() {
       
       const newDataPoint: any = { timestamp, time: now.getTime() }
       data.accounts.forEach((acc: ModelAccount) => {
-        newDataPoint[acc.model] = acc.total_equity - acc.initial_balance
+        newDataPoint[acc.model] = acc.total_pnl
       })
       
       setEquityHistory(prev => {
+        if (prev.length === 0) {
+          const startPoint = { 
+            timestamp: timestamp, 
+            time: now.getTime(),
+            chatgpt: 0,
+            grok: 0,
+            claude: 0,
+            deepseek: 0
+          }
+          return [startPoint, newDataPoint]
+        }
+        
         const lastPoint = prev[prev.length - 1]
         if (lastPoint && now.getTime() - lastPoint.time < 60000) {
           const updated = [...prev]
@@ -150,7 +162,7 @@ function App() {
           return updated
         }
         const updated = [...prev, newDataPoint]
-        return updated.slice(-200) // Keep last 200 data points
+        return updated.slice(-200)
       })
       
       setError(null)
@@ -268,7 +280,7 @@ function App() {
                     stroke="#6b7280" 
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
                     tickLine={false}
-                    domain={['auto', 'auto']}
+                    domain={[(dataMin: number) => Math.min(dataMin, 0), 'auto']}
                     tickFormatter={(value) => {
                       const sign = value >= 0 ? '+' : '';
                       return `${sign}$${value.toFixed(0)}`;
@@ -398,7 +410,7 @@ function App() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Max Drawdown</span>
-                      <span className="text-red-400">{(account.max_drawdown * 100).toFixed(2)}%</span>
+                      <span className="text-red-400">{account.max_drawdown.toFixed(2)}%</span>
                     </div>
                   </div>
                 </CardContent>
