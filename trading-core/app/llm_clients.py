@@ -110,11 +110,13 @@ class LLMClient:
 **TRADING RULES (MUST FOLLOW):**
 1. **Tradable Assets**: ONLY BTC, ETH, BNB, ASTER (all paired with USDT)
 2. **Minimum Order Size**: $50 USD (before leverage) - orders below this will be rejected
-3. **Maximum Capital Usage**: Can only use up to 80% of total account equity - must keep 20% in reserve
-4. **Minimum Close Size**: When closing positions, must close at least 20% of the position
-5. **Leverage**: Must be between 3x and 10x (you decide based on confidence)
-6. **Multiple Positions**: You CAN hold multiple positions across different assets simultaneously
-7. **Autonomy**: You have complete freedom to decide when to enter/exit, position sizes, and leverage within these rules
+3. **Maximum Per-Trade Size**: Cannot exceed 20% of total account equity per trade
+4. **Available Balance Requirement**: If available balance < $100, do NOT open new positions (only close existing ones)
+5. **Maximum Capital Usage**: Total operable amount limited to $400, must keep $100 in reserve
+6. **Minimum Close Size**: When closing positions, must close at least 20% of the position
+7. **Leverage**: Must be between 3x and 10x (you decide based on confidence and market conditions)
+8. **Multiple Positions**: You CAN hold multiple positions across different assets simultaneously
+9. **Full Autonomy**: You have complete freedom to decide long/short, entry/exit timing, position sizes, and leverage within these rules
 
 **AVAILABLE ACTIONS:**
 1. **BUY**: Open a LONG position (betting price will go UP)

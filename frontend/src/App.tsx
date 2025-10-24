@@ -139,7 +139,7 @@ function App() {
       
       const newDataPoint: any = { timestamp, time: now.getTime() }
       data.accounts.forEach((acc: ModelAccount) => {
-        newDataPoint[acc.model] = acc.total_equity
+        newDataPoint[acc.model] = acc.total_pnl
       })
       
       setEquityHistory(prev => {
@@ -147,10 +147,10 @@ function App() {
           const startPoint = { 
             timestamp: timestamp, 
             time: now.getTime(),
-            chatgpt: 500,
-            grok: 500,
-            claude: 500,
-            deepseek: 500
+            chatgpt: 0,
+            grok: 0,
+            claude: 0,
+            deepseek: 0
           }
           return [startPoint, newDataPoint]
         }
@@ -280,9 +280,10 @@ function App() {
                     stroke="#6b7280" 
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
                     tickLine={false}
-                    domain={['auto', 'auto']}
+                    domain={[(dataMin: number) => Math.min(dataMin, 0), 'auto']}
                     tickFormatter={(value) => {
-                      return `$${value.toFixed(0)}`;
+                      const sign = value >= 0 ? '+' : '';
+                      return `${sign}$${value.toFixed(0)}`;
                     }}
                   />
                   {/* Zero reference line */}

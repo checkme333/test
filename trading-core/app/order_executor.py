@@ -74,17 +74,30 @@ async def _execute_open(client, model: str, symbol: str, decision: Dict[str, Any
     
     total_equity = available_balance + total_position_margin + total_unrealized_pnl
     
-    max_usable_equity = total_equity * 0.8
+    if available_balance < 100:
+        logger.warning(f"{model}: Available balance ${available_balance:.2f} < $100, cannot open new positions")
+        return {
+            "status": "skipped",
+            "action": action,
+            "message": f"Available balance ${available_balance:.2f} is below $100 minimum, can only close existing positions"
+        }
+    
+    max_usable_equity = min(total_equity - 100, 400)
     already_used = total_position_margin
     max_operable = max_usable_equity - already_used
     
     if max_operable < 50:
-        logger.warning(f"{model}: Max operable ${max_operable:.2f} < $50, already using 80% of equity")
+        logger.warning(f"{model}: Max operable ${max_operable:.2f} < $50, already at capital limits")
         return {
             "status": "skipped",
             "action": action,
-            "message": f"Already using 80% of total equity (${total_equity:.2f}), cannot open new position"
+            "message": f"Already at maximum capital usage (${already_used:.2f}), cannot open new position"
         }
+    
+    max_per_trade = total_equity * 0.2
+    if size_usd > max_per_trade:
+        logger.warning(f"{model}: Requested size ${size_usd} exceeds 20% of equity (${max_per_trade:.2f}), adjusting")
+        size_usd = max_per_trade
     
     if size_usd < 50:
         logger.warning(f"{model}: Order size ${size_usd} < $50 minimum, skipping")
@@ -96,7 +109,7 @@ async def _execute_open(client, model: str, symbol: str, decision: Dict[str, Any
     
     if size_usd > max_operable:
         logger.warning(f"{model}: Requested size ${size_usd} exceeds max operable ${max_operable:.2f}, adjusting")
-        size_usd = max_operable
+        size_usd = min(size_usd, max_operable)
     
     if size_usd < 50:
         logger.warning(f"{model}: Adjusted size ${size_usd} < $50 minimum after applying limits, skipping")
