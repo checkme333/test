@@ -488,6 +488,74 @@ class DeepSeekClient(LLMClient):
         }
 
 
+class GeminiClient(LLMClient):
+    """Google Gemini API client"""
+    
+    def __init__(self):
+        super().__init__("gemini")
+        self.api_key = os.getenv("GEMINI_API_KEY", "")
+        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+        self.model = "gemini-2.0-flash-exp"
+    
+    async def get_trading_decision(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
+        if self.mock_mode or not self.api_key:
+            return self._mock_decision(market_data)
+        
+        prompt = self._build_prompt(market_data)
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{self.base_url}?key={self.api_key}",
+                    headers={
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "contents": [{
+                            "parts": [{
+                                "text": f"You are an expert trading AI. Always respond with valid JSON only.\n\n{prompt}"
+                            }]
+                        }],
+                        "generationConfig": {
+                            "temperature": 0.7,
+                            "maxOutputTokens": 500
+                        }
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['candidates'][0]['content']['parts'][0]['text']
+                
+                content = content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.startswith("```"):
+                    content = content[3:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                content = content.strip()
+                
+                decision = json.loads(content)
+                logger.info(f"Gemini decision: {decision}")
+                return decision
+                
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            return self._mock_decision(market_data)
+    
+    def _mock_decision(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
+        import random
+        actions = ["BUY", "SELL", "HOLD", "CLOSE"]
+        action = random.choice(actions)
+        
+        return {
+            "action": action,
+            "size_usd": random.uniform(50, 200),
+            "reasoning": f"Mock Gemini decision: AI analysis suggests {action.lower()} based on market patterns.",
+            "confidence": random.uniform(0.6, 0.9)
+        }
+
+
 class LLMClientsRegistry:
     _instance = None
     _clients = None
@@ -503,7 +571,7 @@ class LLMClientsRegistry:
         self._clients = {
             "chatgpt": ChatGPTClient(),
             "grok": GrokClient(),
-            "claude": ClaudeClient(),
+            "gemini": GeminiClient(),
             "deepseek": DeepSeekClient()
         }
         self._initialized = True
@@ -521,6 +589,6 @@ class LLMClientsRegistry:
         return self._clients[key]
     
     def __contains__(self, key):
-        return key in ["chatgpt", "grok", "claude", "deepseek"]
+        return key in ["chatgpt", "grok", "gemini", "deepseek"]
 
 llm_clients = LLMClientsRegistry()

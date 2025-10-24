@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     xai_api_key: str = ""
     anthropic_api_key: str = ""
     deepseek_api_key: str = ""
+    gemini_api_key: str = ""
     
     cloudflare_account_id: str = ""
     cloudflare_gateway_id: str = ""
