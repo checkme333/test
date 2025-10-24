@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart, ReferenceLine } from 'recharts'
 import { TrendingUp, Activity, AlertTriangle } from 'lucide-react'
 import { MaintenancePage } from '@/components/MaintenancePage'
 
@@ -139,13 +139,12 @@ function App() {
       
       const newDataPoint: any = { timestamp, time: now.getTime() }
       data.accounts.forEach((acc: ModelAccount) => {
-        newDataPoint[acc.model] = acc.total_pnl
+        newDataPoint[acc.model] = acc.initial_balance + acc.total_pnl
       })
       
       setEquityHistory(prev => {
         if (prev.length === 0) {
-          const twentyMinutesFromNow = new Date(now.getTime() + 20 * 60000)
-          const startTimestamp = twentyMinutesFromNow.toLocaleString('en-US', { 
+          const startTimestamp = now.toLocaleString('en-US', { 
             month: 'short',
             day: '2-digit',
             hour: '2-digit',
@@ -155,11 +154,11 @@ function App() {
           
           const startPoint = { 
             timestamp: startTimestamp, 
-            time: twentyMinutesFromNow.getTime(),
-            chatgpt: 0,
-            grok: 0,
-            claude: 0,
-            deepseek: 0
+            time: now.getTime(),
+            chatgpt: 500,
+            grok: 500,
+            claude: 500,
+            deepseek: 500
           }
           return [startPoint]
         }
@@ -300,14 +299,10 @@ function App() {
                     stroke="#6b7280" 
                     tick={{ fill: '#9ca3af', fontSize: 12 }}
                     tickLine={false}
-                    domain={[(dataMin: number) => Math.min(dataMin, 0), 'auto']}
-                    tickFormatter={(value) => {
-                      const sign = value >= 0 ? '+' : '';
-                      return `${sign}$${value.toFixed(0)}`;
-                    }}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(value) => `$${value.toFixed(0)}`}
                   />
-                  {/* Zero reference line */}
-                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#6b7280" strokeWidth={1} strokeDasharray="5 5" />
+                  <ReferenceLine y={500} stroke="#6b7280" strokeWidth={1} strokeDasharray="5 5" label={{ value: 'Initial: $500', fill: '#9ca3af', fontSize: 11 }} />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: '#111827', 
@@ -317,11 +312,7 @@ function App() {
                     }}
                     labelStyle={{ color: '#9ca3af', marginBottom: '8px' }}
                     itemStyle={{ color: '#fff' }}
-                    formatter={(value: any) => {
-                      const numValue = Number(value);
-                      const sign = numValue >= 0 ? '+' : '';
-                      return `${sign}$${numValue.toFixed(2)}`;
-                    }}
+                    formatter={(value: any) => `$${Number(value).toFixed(2)}`}
                   />
                   <Legend 
                     wrapperStyle={{ paddingTop: '20px' }}
