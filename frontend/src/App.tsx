@@ -82,19 +82,19 @@ const MODEL_CONFIG = {
   },
   grok: { 
     name: 'Grok',
-    color: '#a855f7',
-    bgColor: 'bg-purple-500/10',
-    textColor: 'text-purple-400',
-    borderColor: 'border-purple-500/30',
-    logo: '/logos/grok.webp'
-  },
-  claude: { 
-    name: 'Claude',
     color: '#f97316', // orange
     bgColor: 'bg-orange-500/10',
     textColor: 'text-orange-400',
     borderColor: 'border-orange-500/30',
-    logo: '/logos/claude.png'
+    logo: '/logos/grok.webp'
+  },
+  qwen: { 
+    name: 'QWEN',
+    color: '#a855f7', // purple
+    bgColor: 'bg-purple-500/10',
+    textColor: 'text-purple-400',
+    borderColor: 'border-purple-500/30',
+    logo: '/logos/qwen.jpeg'
   },
   deepseek: { 
     name: 'DeepSeek',
@@ -157,7 +157,7 @@ function App() {
             time: now.getTime(),
             chatgpt: 500,
             grok: 500,
-            claude: 500,
+            qwen: 500,
             deepseek: 500
           }
           return [startPoint]
@@ -711,7 +711,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="text-center text-gray-500 text-sm">
             <p>AI Trading Competition • Real-time Performance Tracking</p>
-            <p className="mt-1">Powered by ChatGPT, Grok, Claude, and DeepSeek</p>
+            <p className="mt-1">Powered by ChatGPT, Grok, QWEN, and DeepSeek</p>
           </div>
         </div>
       </div>
