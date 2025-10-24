@@ -189,7 +189,7 @@ async def get_balance():
 @app.post("/models/init")
 async def init_models(initial_balance: float = 1000.0):
     try:
-        models = ["chatgpt", "grok", "qwen", "deepseek"]
+        models = ["chatgpt", "grok", "gemini", "deepseek"]
         for model in models:
             db.init_model_account(model, initial_balance)
         return {"status": "ok", "message": f"Initialized {len(models)} model accounts with ${initial_balance} each"}
@@ -447,7 +447,7 @@ async def sync_model_balances():
     try:
         from app.aster_client import get_model_aster_client
         
-        models = ["chatgpt", "grok", "qwen", "deepseek"]
+        models = ["chatgpt", "grok", "gemini", "deepseek"]
         synced = []
         errors = []
         
@@ -501,7 +501,7 @@ async def sync_model_positions():
     try:
         from app.aster_client import get_model_aster_client
         
-        models = ["chatgpt", "grok", "qwen", "deepseek"]
+        models = ["chatgpt", "grok", "gemini", "deepseek"]
         synced = []
         errors = []
         
@@ -566,7 +566,7 @@ async def sync_model_trades():
     try:
         from app.aster_client import get_model_aster_client
         
-        models = ["chatgpt", "grok", "qwen", "deepseek"]
+        models = ["chatgpt", "grok", "gemini", "deepseek"]
         synced = []
         errors = []
         
@@ -658,7 +658,7 @@ async def get_dashboard_stats():
         
         accounts = db.get_all_model_accounts()
         
-        models = ["chatgpt", "grok", "qwen", "deepseek"]
+        models = ["chatgpt", "grok", "gemini", "deepseek"]
         for account in accounts:
             model = account['model']
             if model in models:

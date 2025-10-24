@@ -306,7 +306,7 @@ def get_model_aster_client(model: str) -> AsterClient:
     model_keys = {
         "chatgpt": (settings.chatgpt_aster_api_key, settings.chatgpt_aster_api_secret),
         "grok": (settings.grok_aster_api_key, settings.grok_aster_api_secret),
-        "qwen": (settings.claude_aster_api_key, settings.claude_aster_api_secret),
+        "gemini": (settings.claude_aster_api_key, settings.claude_aster_api_secret),
         "deepseek": (settings.deepseek_aster_api_key, settings.deepseek_aster_api_secret),
     }
     

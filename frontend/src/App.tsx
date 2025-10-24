@@ -88,13 +88,13 @@ const MODEL_CONFIG = {
     borderColor: 'border-orange-500/30',
     logo: '/logos/grok.webp'
   },
-  qwen: { 
-    name: 'QWEN',
+  gemini: { 
+    name: 'Gemini',
     color: '#a855f7', // purple
     bgColor: 'bg-purple-500/10',
     textColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
-    logo: '/logos/qwen.jpeg'
+    logo: '/logos/gemini.png'
   },
   deepseek: { 
     name: 'DeepSeek',
@@ -144,23 +144,7 @@ function App() {
       
       setEquityHistory(prev => {
         if (prev.length === 0) {
-          const startTimestamp = now.toLocaleString('en-US', { 
-            month: 'short',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          }).replace(',', '')
-          
-          const startPoint = { 
-            timestamp: startTimestamp, 
-            time: now.getTime(),
-            chatgpt: 500,
-            grok: 500,
-            qwen: 500,
-            deepseek: 500
-          }
-          return [startPoint]
+          return [newDataPoint]
         }
         
         const lastPoint = prev[prev.length - 1]
@@ -719,7 +703,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="text-center text-gray-500 text-sm">
             <p>AI Trading Competition • Real-time Performance Tracking</p>
-            <p className="mt-1">Powered by ChatGPT, Grok, QWEN, and DeepSeek</p>
+            <p className="mt-1">Powered by ChatGPT, Grok, Gemini, and DeepSeek</p>
           </div>
         </div>
       </div>
