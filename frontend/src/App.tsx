@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { TrendingUp, Activity, AlertTriangle, Twitter } from 'lucide-react'
+import { TrendingUp, Activity, AlertTriangle } from 'lucide-react'
 import { MaintenancePage } from '@/components/MaintenancePage'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
@@ -86,7 +86,7 @@ const MODEL_CONFIG = {
     bgColor: 'bg-purple-500/10',
     textColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
-    logo: '/logos/x-logo.png'
+    logo: '/logos/grok.webp'
   },
   claude: { 
     name: 'Claude',
@@ -144,9 +144,18 @@ function App() {
       
       setEquityHistory(prev => {
         if (prev.length === 0) {
+          const oneHourAgo = new Date(now.getTime() - 3600000)
+          const startTimestamp = oneHourAgo.toLocaleString('en-US', { 
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).replace(',', '')
+          
           const startPoint = { 
-            timestamp: timestamp, 
-            time: now.getTime(),
+            timestamp: startTimestamp, 
+            time: oneHourAgo.getTime(),
             chatgpt: 0,
             grok: 0,
             claude: 0,
@@ -176,7 +185,7 @@ function App() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 5000) // Update every 5 seconds
+    const interval = setInterval(fetchData, 10000)
     return () => clearInterval(interval)
   }, [])
 
@@ -214,7 +223,7 @@ function App() {
                 className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-800/50 hover:bg-gray-700 transition-colors"
                 title="Follow us on X (Twitter)"
               >
-                <Twitter className="w-5 h-5 text-gray-300 hover:text-white" />
+                <img src="/logos/x-logo.png" alt="X" className="w-5 h-5 object-contain brightness-75 hover:brightness-100 transition-all" />
               </a>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Last Update</p>
