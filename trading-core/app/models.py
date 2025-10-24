@@ -59,6 +59,7 @@ class GridSignal(BaseModel):
 
 
 class OrderRequest(BaseModel):
+    model: Optional[str] = None
     symbol: str
     side: OrderSide
     price: Optional[float] = None
