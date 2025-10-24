@@ -82,11 +82,11 @@ const MODEL_CONFIG = {
   },
   grok: { 
     name: 'Grok',
-    color: '#a855f7', // purple
+    color: '#a855f7',
     bgColor: 'bg-purple-500/10',
     textColor: 'text-purple-400',
     borderColor: 'border-purple-500/30',
-    logo: '/logos/grok.webp'
+    logo: '/logos/x-logo.png'
   },
   claude: { 
     name: 'Claude',
@@ -156,13 +156,14 @@ function App() {
         }
         
         const lastPoint = prev[prev.length - 1]
-        if (lastPoint && now.getTime() - lastPoint.time < 60000) {
+        const oneHour = 3600000
+        if (lastPoint && now.getTime() - lastPoint.time < oneHour) {
           const updated = [...prev]
           updated[updated.length - 1] = newDataPoint
           return updated
         }
         const updated = [...prev, newDataPoint]
-        return updated.slice(-200)
+        return updated.slice(-168)
       })
       
       setError(null)
