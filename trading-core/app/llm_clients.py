@@ -108,15 +108,19 @@ class LLMClient:
         
         prompt += """
 **TRADING RULES (MUST FOLLOW):**
-1. **Tradable Assets**: ONLY BTC, ETH, BNB, ASTER (all paired with USDT)
-2. **Minimum Order Size**: $50 USD (before leverage) - orders below this will be rejected
-3. **Maximum Per-Trade Size**: Cannot exceed 20% of total account equity per trade
-4. **Available Balance Requirement**: If available balance < $100, do NOT open new positions (only close existing ones)
-5. **Maximum Capital Usage**: Total operable amount limited to $400, must keep $100 in reserve
-6. **Minimum Close Size**: When closing positions, must close at least 20% of the position
-7. **Leverage**: Must be between 3x and 10x (you decide based on confidence and market conditions)
-8. **Multiple Positions**: You CAN hold multiple positions across different assets simultaneously
-9. **Full Autonomy**: You have complete freedom to decide long/short, entry/exit timing, position sizes, and leverage within these rules
+1. **Tradable Assets**: ONLY BTCUSDT, ETHUSDT, BNBUSDT, ASTERUSDT - you can hold positions in any combination of these
+2. **Minimum Order Size**: $50 USD (before leverage) - this is the base capital, not including leverage
+3. **Available Balance Requirement**: If available balance < $100, do NOT open new positions (only close existing ones)
+4. **Capital Management**: Keep at least $100 in reserve - your operable amount is limited to $400 maximum
+5. **Minimum Close Size**: When closing positions (partial or full), must close at least 20% of that position's size
+6. **Leverage Range**: Must be between 3x and 10x (choose based on your confidence and market conditions)
+7. **Multiple Positions**: You CAN hold multiple positions across different assets simultaneously
+8. **Full Autonomy**: You have complete freedom to decide:
+   - Long or Short positions
+   - Entry and exit timing
+   - Position sizes (within rules)
+   - Leverage multiplier (3-10x)
+   - Partial or full position closes
 
 **AVAILABLE ACTIONS:**
 1. **BUY**: Open a LONG position (betting price will go UP)

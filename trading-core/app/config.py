@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     grok_aster_api_secret: str = ""
     claude_aster_api_key: str = ""
     claude_aster_api_secret: str = ""
+    gemini_aster_api_key: str = ""
+    gemini_aster_api_secret: str = ""
     deepseek_aster_api_key: str = ""
     deepseek_aster_api_secret: str = ""
     
