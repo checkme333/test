@@ -144,8 +144,8 @@ function App() {
       
       setEquityHistory(prev => {
         if (prev.length === 0) {
-          const oneHourAgo = new Date(now.getTime() - 3600000)
-          const startTimestamp = oneHourAgo.toLocaleString('en-US', { 
+          const twentyMinutesFromNow = new Date(now.getTime() + 20 * 60000)
+          const startTimestamp = twentyMinutesFromNow.toLocaleString('en-US', { 
             month: 'short',
             day: '2-digit',
             hour: '2-digit',
@@ -155,24 +155,34 @@ function App() {
           
           const startPoint = { 
             timestamp: startTimestamp, 
-            time: oneHourAgo.getTime(),
+            time: twentyMinutesFromNow.getTime(),
             chatgpt: 0,
             grok: 0,
             claude: 0,
             deepseek: 0
           }
-          return [startPoint, newDataPoint]
+          return [startPoint]
         }
         
         const lastPoint = prev[prev.length - 1]
-        const oneHour = 3600000
-        if (lastPoint && now.getTime() - lastPoint.time < oneHour) {
+        const thirtyMinutes = 30 * 60000 // 30 minutes in milliseconds
+        
+        if (lastPoint && now.getTime() - lastPoint.time >= thirtyMinutes) {
+          const updated = [...prev, newDataPoint]
+          return updated.slice(-8) // Keep last 8 points (4 hours of data at 30-min intervals)
+        }
+        
+        if (prev.length > 0 && now.getTime() < prev[0].time) {
+          return prev
+        }
+        
+        if (prev.length > 0) {
           const updated = [...prev]
           updated[updated.length - 1] = newDataPoint
           return updated
         }
-        const updated = [...prev, newDataPoint]
-        return updated.slice(-168)
+        
+        return prev
       })
       
       setError(null)
@@ -220,10 +230,10 @@ function App() {
                 href="https://x.com/ArenaAlgo" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-800/50 hover:bg-gray-700 transition-colors"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-white hover:bg-gray-100 transition-colors"
                 title="Follow us on X (Twitter)"
               >
-                <img src="/logos/x-logo.png" alt="X" className="w-5 h-5 object-contain brightness-75 hover:brightness-100 transition-all" />
+                <img src="/logos/x-logo.png" alt="X" className="w-5 h-5 object-contain" />
               </a>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Last Update</p>
