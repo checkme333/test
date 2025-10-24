@@ -26,7 +26,7 @@
             {
               "id": "models",
               "name": "models",
-              "value": "={{ [\"chatgpt\", \"grok\", \"claude\", \"deepseek\"] }}",
+              "value": "={{ [\"chatgpt\", \"grok\", \"gemini\", \"deepseek\"] }}",
               "type": "array"
             },
             {
