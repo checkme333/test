@@ -1,0 +1,78 @@
+{
+  "name": "AI Trading Decisions (Every 3 Minutes)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 3 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const models = [\"chatgpt\", \"grok\", \"gemini\", \"deepseek\"];\nconst symbols = [\"BTCUSDT\", \"ETHUSDT\", \"BNBUSDT\", \"ASTERUSDT\"];\n\n// Return one item per model\nreturn models.map(model => ({\n  json: {\n    model: model,\n    symbol: symbols[Math.floor(Math.random() * symbols.length)]\n  }\n}));"
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/llm/execute-decision?model={{ $json.model }}&symbol={{ $json.symbol }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "execute-decision",
+      "name": "Execute AI Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Every 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Execute AI Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-22T00:00:00.000Z",
+  "versionId": "1"
+}
