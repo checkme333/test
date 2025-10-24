@@ -263,7 +263,7 @@ class Database:
                         updated_at = NOW();
                 """, order)
     
-    def get_orders(self, model: Optional[str] = None, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_orders(self, model: Optional[str] = None, symbol: Optional[str] = None, limit: int = 1000) -> List[Dict[str, Any]]:
         with self.get_connection() as conn:
             with conn.cursor() as cur:
                 query = "SELECT * FROM orders WHERE 1=1"
@@ -274,7 +274,7 @@ class Database:
                 if symbol:
                     query += " AND symbol = %s"
                     params.append(symbol)
-                query += " ORDER BY created_at DESC LIMIT 1000;"
+                query += f" ORDER BY created_at DESC LIMIT {limit};"
                 cur.execute(query, params)
                 return cur.fetchall()
     

@@ -339,6 +339,8 @@ function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {sortedAccounts.map((account, index) => {
             const config = MODEL_CONFIG[account.model as keyof typeof MODEL_CONFIG]
+            if (!config) return null
+            
             const winRate = account.total_trades > 0 
               ? (account.winning_trades / account.total_trades * 100).toFixed(1) 
               : '0.0'
@@ -475,6 +477,8 @@ function App() {
                 .slice(0, 50)
                 .map((decision) => {
                   const config = MODEL_CONFIG[decision.model as keyof typeof MODEL_CONFIG]
+                  if (!config) return null
+                  
                   return (
                     <div 
                       key={decision.id} 
@@ -555,6 +559,8 @@ function App() {
                       .filter(p => selectedModel === 'all' || p.model === selectedModel)
                       .map((pos, idx) => {
                         const config = MODEL_CONFIG[pos.model as keyof typeof MODEL_CONFIG]
+                        if (!config) return null
+                        
                         const isProfitable = pos.unrealized_pnl >= 0
                         return (
                           <tr key={idx} className="border-b border-gray-800/50 hover:bg-gray-800/30">
@@ -623,6 +629,8 @@ function App() {
                       .slice(0, 100)
                       .map((order) => {
                         const config = MODEL_CONFIG[order.model as keyof typeof MODEL_CONFIG]
+                        if (!config) return null
+                        
                         const isProfitable = order.pnl >= 0
                         return (
                           <tr key={order.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">

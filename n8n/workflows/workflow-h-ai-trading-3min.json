@@ -1,0 +1,166 @@
+{
+  "name": "AI Trading Decisions (Every 3 Minutes)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 3 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "models",
+              "name": "models",
+              "value": "={{ [\"chatgpt\", \"grok\", \"claude\", \"deepseek\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "symbols",
+              "name": "symbols",
+              "value": "={{ [\"BTCUSDT\", \"ETHUSDT\", \"BNBUSDT\", \"ASTERUSDT\"] }}",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "id": "set-config",
+      "name": "Set Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-models",
+      "name": "Split Models",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const models = $input.item.json.models;\nconst symbols = $input.item.json.symbols;\nconst modelIndex = $index;\nconst model = models[modelIndex];\nconst symbol = symbols[Math.floor(Math.random() * symbols.length)];\n\nreturn {\n  model: model,\n  symbol: symbol\n};"
+      },
+      "id": "select-symbol",
+      "name": "Select Random Symbol",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/llm/execute-decision?model={{ $json.model }}&symbol={{ $json.symbol }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "execute-decision",
+      "name": "Execute AI Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {},
+      "id": "loop-back",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Every 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Split Models",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Models": {
+      "main": [
+        [
+          {
+            "node": "Select Random Symbol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Random Symbol": {
+      "main": [
+        [
+          {
+            "node": "Execute AI Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute AI Decision": {
+      "main": [
+        [
+          {
+            "node": "Loop Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Back": {
+      "main": [
+        [
+          {
+            "node": "Split Models",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-22T00:00:00.000Z",
+  "versionId": "1"
+}
