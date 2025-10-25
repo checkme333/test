@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     aster_api_key: str = ""
     aster_api_secret: str = ""
     aster_base_url: str = "https://fapi.asterdex.com"
+    mock_mode: bool = False
     
     risk_max_leverage: int = 2
     risk_max_daily_loss: float = -200

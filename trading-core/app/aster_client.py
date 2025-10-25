@@ -2,6 +2,8 @@ import httpx
 import hmac
 import hashlib
 import time
+import os
+import uuid
 from typing import Optional, Dict, Any, List
 from app.config import settings
 from app.models import OrderRequest, Position, Order, OrderStatus, OrderSide
@@ -16,6 +18,9 @@ class AsterClient:
         self.api_key = settings.aster_api_key
         self.api_secret = settings.aster_api_secret
         self.client = httpx.AsyncClient(timeout=30.0)
+        self.mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        if self.mock_mode:
+            logger.info("🎭 MOCK MODE ENABLED - Using simulated Aster API responses")
     
     def _generate_signature(self, params: Dict[str, Any]) -> str:
         query_string = "&".join([f"{k}={v}" for k, v in sorted(params.items())])
@@ -75,6 +80,24 @@ class AsterClient:
         return await self._request("GET", endpoint, params, signed=False)
     
     async def place_order(self, order: OrderRequest) -> Dict[str, Any]:
+        if self.mock_mode:
+            mock_order_id = str(uuid.uuid4())[:8]
+            mock_response = {
+                'orderId': mock_order_id,
+                'symbol': order.symbol,
+                'status': 'NEW',
+                'clientOrderId': order.client_order_id or f"mock_{mock_order_id}",
+                'price': str(order.price) if order.price else '0',
+                'origQty': str(order.qty),
+                'executedQty': '0',
+                'side': order.side.value.upper(),
+                'type': order.order_type,
+                'timeInForce': order.time_in_force,
+                'updateTime': int(time.time() * 1000)
+            }
+            logger.info(f"🎭 MOCK: Order placed: {mock_response}")
+            return mock_response
+        
         endpoint = "/fapi/v1/order"
         params = {
             'symbol': order.symbol,
@@ -154,6 +177,27 @@ class AsterClient:
         return await self._request("GET", endpoint, params)
     
     async def get_position(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        if self.mock_mode:
+            mock_positions = [{
+                'symbol': symbol or 'SOLUSDT',
+                'positionAmt': '0',
+                'entryPrice': '0',
+                'markPrice': '200.50',
+                'unRealizedProfit': '0',
+                'liquidationPrice': '0',
+                'leverage': '2',
+                'maxNotionalValue': '5000',
+                'marginType': 'cross',
+                'isolatedMargin': '0',
+                'isAutoAddMargin': 'false',
+                'positionSide': 'BOTH',
+                'notional': '0',
+                'isolatedWallet': '0',
+                'updateTime': int(time.time() * 1000)
+            }]
+            logger.info(f"🎭 MOCK: Returning positions: {mock_positions}")
+            return mock_positions
+        
         endpoint = "/fapi/v2/positionRisk"
         params = {}
         if symbol:

@@ -39,28 +39,19 @@ services:
     image: n8nio/n8n:latest
     container_name: grid-n8n
     environment:
-      - N8N_HOST=${N8N_HOST:-hook.yourdomain.com}
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
       - N8N_PORT=5678
-      - WEBHOOK_URL=${N8N_PROTOCOL:-https}://${N8N_HOST:-hook.yourdomain.com}/
+      - WEBHOOK_URL=${N8N_PROTOCOL:-http}://${N8N_HOST:-localhost}:5678/
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - EXECUTIONS_MODE=queue
-      - QUEUE_BULL_REDIS_HOST=redis
-      - QUEUE_BULL_REDIS_PORT=6379
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=tradeuser
-      - DB_POSTGRESDB_PASSWORD=tradepass
+      - EXECUTIONS_MODE=regular
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
     ports:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/workflows
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
