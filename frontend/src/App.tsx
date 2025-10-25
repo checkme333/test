@@ -85,6 +85,14 @@ function App() {
       const snapshots: PnLSnapshot[] = snapshotsData.snapshots || []
       const timestampMap = new Map<string, ChartDataPoint>()
       
+      const initialPoint: ChartDataPoint = {
+        timestamp: 'Start',
+        chatgpt: 0,
+        grok: 0,
+        gemini: 0,
+        deepseek: 0
+      }
+      
       snapshots.forEach((snapshot) => {
         const timestamp = new Date(snapshot.timestamp).toLocaleTimeString('en-US', { 
           hour: '2-digit', 
@@ -99,11 +107,11 @@ function App() {
         point[snapshot.model as keyof Omit<ChartDataPoint, 'timestamp'>] = snapshot.pnl
       })
       
-      const chartDataArray = Array.from(timestampMap.values()).sort((a, b) => {
+      const chartDataArray = [initialPoint, ...Array.from(timestampMap.values()).sort((a, b) => {
         const timeA = new Date(`1970-01-01 ${a.timestamp}`)
         const timeB = new Date(`1970-01-01 ${b.timestamp}`)
         return timeA.getTime() - timeB.getTime()
-      })
+      })]
       
       setChartData(chartDataArray)
       setError(null)
@@ -247,6 +255,7 @@ function App() {
                       <YAxis 
                         label={{ value: 'PnL ($)', angle: -90, position: 'insideLeft' }}
                         tick={{ fontSize: 12 }}
+                        domain={[-600, 600]}
                       />
                       <Tooltip 
                         formatter={(value: number) => `$${value.toFixed(2)}`}

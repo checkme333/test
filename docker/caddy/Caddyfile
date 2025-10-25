@@ -2,6 +2,16 @@
     email admin@yourdomain.com
 }
 
+algoarena.app {
+    root * /srv/frontend
+    file_server
+    try_files {path} /index.html
+    
+    log {
+        output file /var/log/caddy/algoarena.log
+    }
+}
+
 grid.jimmysan.com {
     root * /srv/frontend
     file_server

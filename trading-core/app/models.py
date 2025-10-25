@@ -134,3 +134,10 @@ class PnLMetrics(BaseModel):
     max_drawdown: float
     exposure: float
     timestamp: datetime
+
+
+class PnLSnapshot(BaseModel):
+    id: Optional[int] = None
+    model: str
+    pnl: float
+    timestamp: datetime

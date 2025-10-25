@@ -31,19 +31,19 @@
     },
     {
       "parameters": {
-        "url": "=http://trading-core:8000/pnl?model={{ $json.model }}&window=all",
+        "url": "=http://trading-core:8000/models/{{ $json.model }}/account",
         "method": "GET",
         "options": {}
       },
-      "id": "get-pnl",
-      "name": "Get Current PNL",
+      "id": "get-account",
+      "name": "Get Account Balance",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [650, 300]
     },
     {
       "parameters": {
-        "jsCode": "const model = $input.item.json.model;\nconst metrics = $input.item.json.metrics;\n\nif (!metrics || metrics.length === 0) {\n  return [{\n    json: {\n      model: model,\n      pnl: 0\n    }\n  }];\n}\n\nconst latestMetric = metrics[0];\nconst pnl = latestMetric.pnl || 0;\n\nreturn [{\n  json: {\n    model: model,\n    pnl: pnl\n  }\n}];"
+        "jsCode": "const model = $input.item.json.model;\nconst account = $input.item.json;\n\nif (!account || !account.current_balance) {\n  return [{\n    json: {\n      model: model,\n      pnl: 0\n    }\n  }];\n}\n\nconst initialBalance = 500;\nconst currentBalance = account.current_balance || 0;\nconst unrealizedPnl = account.unrealized_pnl || 0;\nconst totalEquity = currentBalance + unrealizedPnl;\nconst pnl = totalEquity - initialBalance;\n\nreturn [{\n  json: {\n    model: model,\n    pnl: pnl\n  }\n}];"
       },
       "id": "extract-pnl",
       "name": "Extract PNL",
@@ -80,14 +80,14 @@
       "main": [
         [
           {
-            "node": "Get Current PNL",
+            "node": "Get Account Balance",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Current PNL": {
+    "Get Account Balance": {
       "main": [
         [
           {
