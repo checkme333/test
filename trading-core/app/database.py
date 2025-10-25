@@ -103,6 +103,21 @@ class Database:
                     CREATE INDEX IF NOT EXISTS idx_metrics_model_ts 
                     ON metrics(model, ts DESC);
                 """)
+                
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS pnl_snapshots (
+                        id SERIAL PRIMARY KEY,
+                        model TEXT NOT NULL,
+                        pnl NUMERIC NOT NULL,
+                        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+                        UNIQUE(model, timestamp)
+                    );
+                """)
+                
+                cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_pnl_snapshots_model_ts 
+                    ON pnl_snapshots(model, timestamp DESC);
+                """)
     
     def upsert_grid_config(self, config: Dict[str, Any]) -> int:
         with self.get_connection() as conn:
@@ -247,6 +262,41 @@ class Database:
                     SET status = %s, updated_at = NOW()
                     WHERE model = %s AND symbol = %s;
                 """, (status, model, symbol))
+    
+    def insert_pnl_snapshot(self, model: str, pnl: float, timestamp: Optional[datetime] = None):
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                if timestamp is None:
+                    cur.execute("""
+                        INSERT INTO pnl_snapshots (model, pnl, timestamp)
+                        VALUES (%s, %s, NOW())
+                        ON CONFLICT (model, timestamp) DO UPDATE SET pnl = EXCLUDED.pnl;
+                    """, (model, pnl))
+                else:
+                    cur.execute("""
+                        INSERT INTO pnl_snapshots (model, pnl, timestamp)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (model, timestamp) DO UPDATE SET pnl = EXCLUDED.pnl;
+                    """, (model, pnl, timestamp))
+    
+    def get_pnl_snapshots(self, model: Optional[str] = None, hours: int = 24) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                if model:
+                    cur.execute("""
+                        SELECT model, pnl, timestamp 
+                        FROM pnl_snapshots 
+                        WHERE model = %s AND timestamp >= NOW() - INTERVAL '%s hours'
+                        ORDER BY timestamp ASC;
+                    """, (model, hours))
+                else:
+                    cur.execute("""
+                        SELECT model, pnl, timestamp 
+                        FROM pnl_snapshots 
+                        WHERE timestamp >= NOW() - INTERVAL '%s hours'
+                        ORDER BY timestamp ASC;
+                    """, (hours,))
+                return cur.fetchall()
 
 
 db = Database()

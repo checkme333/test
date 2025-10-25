@@ -1,0 +1,122 @@
+{
+  "name": "PNL Snapshots (Every 30 Minutes)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const models = [\"chatgpt\", \"grok\", \"gemini\", \"deepseek\"];\n\nreturn models.map(model => ({\n  json: {\n    model: model\n  }\n}));"
+      },
+      "id": "set-models",
+      "name": "Set Models",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/pnl?model={{ $json.model }}&window=all",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "get-pnl",
+      "name": "Get Current PNL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const model = $input.item.json.model;\nconst metrics = $input.item.json.metrics;\n\nif (!metrics || metrics.length === 0) {\n  return [{\n    json: {\n      model: model,\n      pnl: 0\n    }\n  }];\n}\n\nconst latestMetric = metrics[0];\nconst pnl = latestMetric.pnl || 0;\n\nreturn [{\n  json: {\n    model: model,\n    pnl: pnl\n  }\n}];"
+      },
+      "id": "extract-pnl",
+      "name": "Extract PNL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://trading-core:8000/pnl/snapshot?model={{ $json.model }}&pnl={{ $json.pnl }}",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "save-snapshot",
+      "name": "Save PNL Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Models",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Models": {
+      "main": [
+        [
+          {
+            "node": "Get Current PNL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current PNL": {
+      "main": [
+        [
+          {
+            "node": "Extract PNL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PNL": {
+      "main": [
+        [
+          {
+            "node": "Save PNL Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-22T00:00:00.000Z",
+  "versionId": "1"
+}

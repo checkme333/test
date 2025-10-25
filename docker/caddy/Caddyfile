@@ -2,7 +2,17 @@
     email admin@yourdomain.com
 }
 
-api.yourdomain.com {
+grid.jimmysan.com {
+    root * /srv/frontend
+    file_server
+    try_files {path} /index.html
+    
+    log {
+        output file /var/log/caddy/grid.log
+    }
+}
+
+api.jimmysan.com {
     reverse_proxy trading-core:8000
     
     log {
@@ -10,7 +20,7 @@ api.yourdomain.com {
     }
 }
 
-hook.yourdomain.com {
+hook.jimmysan.com {
     reverse_proxy n8n:5678
     
     log {

@@ -19,6 +19,20 @@ interface ModelMetrics {
   timestamp: string
 }
 
+interface PnLSnapshot {
+  model: string
+  pnl: number
+  timestamp: string
+}
+
+interface ChartDataPoint {
+  timestamp: string
+  chatgpt?: number
+  grok?: number
+  gemini?: number
+  deepseek?: number
+}
+
 interface Order {
   id: number
   model: string
@@ -34,30 +48,64 @@ interface Order {
 function App() {
   const [chatgptMetrics, setChatgptMetrics] = useState<ModelMetrics | null>(null)
   const [grokMetrics, setGrokMetrics] = useState<ModelMetrics | null>(null)
+  const [geminiMetrics, setGeminiMetrics] = useState<ModelMetrics | null>(null)
+  const [deepseekMetrics, setDeepseekMetrics] = useState<ModelMetrics | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = async () => {
     try {
-      const [metricsRes, ordersRes] = await Promise.all([
+      const [metricsRes, ordersRes, snapshotsRes] = await Promise.all([
         fetch(`${API_BASE}/pnl?window=daily`),
-        fetch(`${API_BASE}/orders`)
+        fetch(`${API_BASE}/orders`),
+        fetch(`${API_BASE}/pnl/snapshots?hours=24`)
       ])
 
-      if (!metricsRes.ok || !ordersRes.ok) {
+      if (!metricsRes.ok || !ordersRes.ok || !snapshotsRes.ok) {
         throw new Error('Failed to fetch data')
       }
 
       const metricsData = await metricsRes.json()
       const ordersData = await ordersRes.json()
+      const snapshotsData = await snapshotsRes.json()
 
       const chatgpt = metricsData.metrics?.find((m: ModelMetrics) => m.model === 'chatgpt')
       const grok = metricsData.metrics?.find((m: ModelMetrics) => m.model === 'grok')
+      const gemini = metricsData.metrics?.find((m: ModelMetrics) => m.model === 'gemini')
+      const deepseek = metricsData.metrics?.find((m: ModelMetrics) => m.model === 'deepseek')
 
       setChatgptMetrics(chatgpt || null)
       setGrokMetrics(grok || null)
+      setGeminiMetrics(gemini || null)
+      setDeepseekMetrics(deepseek || null)
       setOrders(ordersData.orders || [])
+      
+      const snapshots: PnLSnapshot[] = snapshotsData.snapshots || []
+      const timestampMap = new Map<string, ChartDataPoint>()
+      
+      snapshots.forEach((snapshot) => {
+        const timestamp = new Date(snapshot.timestamp).toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })
+        
+        if (!timestampMap.has(timestamp)) {
+          timestampMap.set(timestamp, { timestamp })
+        }
+        
+        const point = timestampMap.get(timestamp)!
+        point[snapshot.model as keyof Omit<ChartDataPoint, 'timestamp'>] = snapshot.pnl
+      })
+      
+      const chartDataArray = Array.from(timestampMap.values()).sort((a, b) => {
+        const timeA = new Date(`1970-01-01 ${a.timestamp}`)
+        const timeB = new Date(`1970-01-01 ${b.timestamp}`)
+        return timeA.getTime() - timeB.getTime()
+      })
+      
+      setChartData(chartDataArray)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -164,9 +212,11 @@ function App() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <ModelCard metrics={chatgptMetrics} title="ChatGPT Strategy" color="text-blue-600" />
-          <ModelCard metrics={grokMetrics} title="Grok Strategy" color="text-purple-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <ModelCard metrics={chatgptMetrics} title="ChatGPT" color="text-blue-600" />
+          <ModelCard metrics={grokMetrics} title="Grok" color="text-orange-600" />
+          <ModelCard metrics={geminiMetrics} title="Gemini" color="text-purple-600" />
+          <ModelCard metrics={deepseekMetrics} title="DeepSeek" color="text-green-600" />
         </div>
 
         <Tabs defaultValue="comparison" className="space-y-6">
@@ -179,26 +229,74 @@ function App() {
           <TabsContent value="comparison">
             <Card>
               <CardHeader>
-                <CardTitle>Equity Curve Comparison</CardTitle>
-                <CardDescription>Real-time PnL comparison between models</CardDescription>
+                <CardTitle>PnL Performance Comparison</CardTitle>
+                <CardDescription>Real-time PnL tracking (updated every 30 minutes)</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={[]}>
+                    <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="timestamp" />
-                      <YAxis />
-                      <Tooltip />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis 
+                        label={{ value: 'PnL ($)', angle: -90, position: 'insideLeft' }}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => `$${value.toFixed(2)}`}
+                        labelStyle={{ color: '#000' }}
+                      />
                       <Legend />
-                      <Line type="monotone" dataKey="chatgpt" stroke="#3b82f6" strokeWidth={2} />
-                      <Line type="monotone" dataKey="grok" stroke="#a855f7" strokeWidth={2} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="chatgpt" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2} 
+                        name="ChatGPT"
+                        dot={{ r: 4 }}
+                        connectNulls
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="grok" 
+                        stroke="#f97316" 
+                        strokeWidth={2} 
+                        name="Grok"
+                        dot={{ r: 4 }}
+                        connectNulls
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="gemini" 
+                        stroke="#a855f7" 
+                        strokeWidth={2} 
+                        name="Gemini"
+                        dot={{ r: 4 }}
+                        connectNulls
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="deepseek" 
+                        stroke="#22c55e" 
+                        strokeWidth={2} 
+                        name="DeepSeek"
+                        dot={{ r: 4 }}
+                        connectNulls
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-4 text-center text-sm text-gray-500">
-                  Chart will populate as trading data accumulates
-                </div>
+                {chartData.length === 0 && (
+                  <div className="mt-4 text-center text-sm text-gray-500">
+                    PnL snapshots will appear here. Data is recorded every 30 minutes.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

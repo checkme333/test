@@ -154,3 +154,26 @@ async def get_balance():
     except Exception as e:
         logger.error(f"Error fetching balance: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pnl/snapshots")
+async def get_pnl_snapshots(
+    model: Optional[str] = Query(None),
+    hours: int = Query(24, ge=1, le=168)
+):
+    try:
+        snapshots = db.get_pnl_snapshots(model=model, hours=hours)
+        return {"snapshots": snapshots}
+    except Exception as e:
+        logger.error(f"Error fetching PNL snapshots: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/pnl/snapshot")
+async def create_pnl_snapshot(model: str, pnl: float):
+    try:
+        db.insert_pnl_snapshot(model, pnl)
+        return {"status": "ok", "message": f"PNL snapshot created for {model}"}
+    except Exception as e:
+        logger.error(f"Error creating PNL snapshot: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
